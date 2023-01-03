@@ -243,6 +243,13 @@ def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
 
     return embed_play
 
+# Compose queue add confirmation message
+def queue_msg(url="", song_title=""):
+    embed_queue = discord.Embed(title="👍 Added to queue!", 
+        color=config.color_success)
+    embed_queue.add_field(name="💿 Track", value=f"[{song_title}]({url})", inline=False)
+    return embed_queue
+
 # Check if YouTube link is valid
 def is_supported(url):
     # Do not accept shorts links
@@ -353,10 +360,38 @@ async def play(interaction: discord.Interaction, url: str) -> None:
         await play_next(interaction)
     
     # Confirm add to queue
-    embed_queue = discord.Embed(title="👍 Added to queue!", 
-        color=config.color_success)
-    embed_queue.add_field(name="💿 Track", value=f"[{new_song['title']}]({url})", inline=False)
-    await interaction.edit_original_response(embed=embed_queue)
+    await interaction.edit_original_response(embed=queue_msg(url, new_song['title']))
+
+# Voice channel commands: "search"
+# Search on YouTube
+@bot.tree.command(description="Searches YouTube using keyword specified", guilds=bot.guilds)
+async def search(interaction: discord.Interaction, keyword: str) -> None:
+    await interaction.response.defer(thinking=True)
+
+    result = ytdl.extract_info(f"ytsearch: {keyword}", download=False)['entries'][0]  # YouTube search only returns 1 result anyway
+
+    if result is not None:
+        new_song = {
+            "url": result['webpage_url'],
+            "title": result['title'],
+            "duration": result['duration']
+        }
+        song_queue.append(new_song)
+
+        user_vc = check_voice_channel(interaction)
+        voice_client = check_bot_in_voice(interaction)
+
+        if user_vc is None:
+            await interaction.edit_original_response(content="🤷 You are not in a voice channel!")
+            return
+        elif (voice_client is None) or not (voice_client.is_playing() or voice_client.is_paused()):  # Start queue
+            await join_voice(interaction)
+            await play_next(interaction)
+        
+        # Confirm add to queue
+        await interaction.edit_original_response(embed=queue_msg(new_song['url'], new_song['title']))
+    else:
+        await interaction.edit_original_response(content="🤷 No results!")
 
 # Voice channel commands: "pause"
 # Pause bot
