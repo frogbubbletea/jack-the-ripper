@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 
 import config
 
+# Uncomment when running on replit (1/3)
+# from keep_alive import keep_alive
+
 # change working directory to wherever bot.py is in
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -19,6 +22,9 @@ os.chdir(dname)
 # load bot token
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+
+# Uncomment when running on replit (2/3)
+# discord.opus.load_opus("./libopus.so.0.8.0")
 
 # define bot
 intents = discord.Intents.default()
@@ -646,6 +652,9 @@ async def sync(ctx):
     else:
         await ctx.send("Impostor! You are not the chosen one!")
 # Text commands end
+
+# Uncomment when running on replit (3/3)
+# keep_alive()
 
 # (text) command not found error handling
 @bot.event
