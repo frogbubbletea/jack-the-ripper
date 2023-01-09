@@ -6,6 +6,7 @@ import youtube_dl
 
 import os
 import time
+import random
 import asyncio
 from dotenv import load_dotenv
 
@@ -112,11 +113,8 @@ async def on_ready():
 # testing commands
 @bot.tree.command(description="Test test test", guilds=bot.guilds)
 async def test(interaction: discord.Interaction) -> None:
-    await interaction.response.send_message("Yep, it's working!")
-
-@bot.tree.command(description="Yest yest yest", guilds=bot.guilds)
-async def yest(interaction: discord.Interaction) -> None:
-    await interaction.response.send_message("Jack the Ripper has started a break")
+    test_messages = ["Yep, it's working!", "Jack the Ripper has started a break"]
+    await interaction.response.send_message(random.choice(test_messages))
 
 # "succ" command
 @bot.tree.command(description="Consumes the last message in the channel.", guilds=bot.guilds)
