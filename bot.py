@@ -31,6 +31,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 bot = commands.Bot(command_prefix="+", intents=intents, activity=discord.Game(name="The Legend of Zelda: Link's Awakening"), help_command=None)
 
 # Prepare song queues
@@ -113,6 +114,19 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
+# Function for on ready and on guild join events
+# Prepare a queue for a guild
+def add_queue(guild):
+    queue_guild = {
+            'id': guild.id,
+            'loop': 0,
+            'queue': []
+        }
+    song_queues.append(queue_guild)
+
+# On ready event
+# Display bot guilds
+# Prepare a queue for each guild the bot is in
 @bot.event
 async def on_ready():
     for guild in bot.guilds:
@@ -120,12 +134,15 @@ async def on_ready():
             f'{bot.user} is connected to the following guild(s):\n'
             f'{guild.name}(id: {guild.id})'
         )
-        queue_guild = {
-            'id': guild.id,
-            'loop': 0,
-            'queue': []
-        }
-        song_queues.append(queue_guild)
+        add_queue(guild)
+
+@bot.event
+async def on_guild_join(guild):
+    print(
+        f'{bot.user} joined the following guild:\n'
+        f'{guild.name}(id: {guild.id})'
+    )
+    add_queue(guild)
 
 # Slash commands start
 # testing commands
