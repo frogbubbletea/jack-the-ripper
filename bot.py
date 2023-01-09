@@ -33,11 +33,23 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="+", intents=intents, activity=discord.Game(name="The Legend of Zelda: Link's Awakening"), help_command=None)
 
-# Load song queues
-song_queue = []
+# Prepare song queues
+song_queues = []
 
-# Store loop status
-loop_status = 0
+# Find the queue for a guild
+def find_queue(id):
+    queue = next((guild for guild in song_queues if guild['id'] == id), None)['queue']
+    return queue
+
+# Find loop status for a guild
+def find_loop(id):
+    loop = next((guild for guild in song_queues if guild['id'] == id), None)['loop']
+    return loop
+
+# Find entry of guild in queues
+def find_guild(id):
+    guild = next((guild for guild in song_queues if guild['id'] == id), None)
+    return guild
 
 # Record track start/pause time
 start_time = time.time()
@@ -108,6 +120,12 @@ async def on_ready():
             f'{bot.user} is connected to the following guild(s):\n'
             f'{guild.name}(id: {guild.id})'
         )
+        queue_guild = {
+            'id': guild.id,
+            'loop': 0,
+            'queue': []
+        }
+        song_queues.append(queue_guild)
 
 # Slash commands start
 # testing commands
@@ -222,6 +240,7 @@ async def join_voice(interaction):
 
 # Compose playback method confirmation message
 def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
+    loop_status = find_loop(interaction.guild_id)
     titles = ["▶️ Started playing!", 
         "⏸️ Paused!", 
         "⏯️ Resumed!",
@@ -277,7 +296,9 @@ def get_title(url, info='title'):
 
 # Play next track in queue
 async def play_next(interaction, start_queue=True):
-    global start_time 
+    global start_time
+    song_queue = find_queue(interaction.guild_id)
+    loop_status = find_loop(interaction.guild_id)
     # Move queue before playing next track
     if start_queue == False and len(song_queue) >= 1:
         if loop_status == 0:
@@ -322,6 +343,7 @@ async def join(interaction: discord.Interaction) -> None:
 # Leave user's voice channel if they are in one, and clear queue
 @bot.tree.command(description="Clears the queue, and makes Jack leave your voice channel.", guilds=bot.guilds)
 async def leave(interaction: discord.Interaction) -> None:
+    song_queue = find_queue(interaction.guild_id) 
     # Clear queue
     song_queue.clear()
 
@@ -338,6 +360,7 @@ async def leave(interaction: discord.Interaction) -> None:
 @bot.tree.command(description="Plays audio from YouTube. Shorts and playlists are not supported!", guilds=bot.guilds)
 async def play(interaction: discord.Interaction, url: str) -> None:
     await interaction.response.defer(thinking=True)
+    song_queue = find_queue(interaction.guild_id) 
     # Add url to queue
     if is_supported(url):
         # song_queue.append(url)
@@ -371,6 +394,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
 @bot.tree.command(description="Searches YouTube using keyword specified", guilds=bot.guilds)
 async def search(interaction: discord.Interaction, keyword: str) -> None:
     await interaction.response.defer(thinking=True)
+    song_queue = find_queue(interaction.guild_id) 
 
     result = ytdl.extract_info(f"ytsearch: {keyword}", download=False)['entries'][0]  # YouTube search only returns 1 result anyway
 
@@ -404,6 +428,7 @@ async def pause(interaction: discord.Interaction) -> None:
     global pause_time
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
 
     if voice_client is not None:
         if voice_client.is_playing():
@@ -426,6 +451,7 @@ async def resume(interaction: discord.Interaction) -> None:
     global start_time
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
 
     if voice_client is not None:
         if voice_client.is_paused():
@@ -447,6 +473,7 @@ async def resume(interaction: discord.Interaction) -> None:
 async def stop(interaction: discord.Interaction) -> None:
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
 
     if voice_client is not None:
         if voice_client.is_playing() or voice_client.is_paused():
@@ -469,6 +496,8 @@ async def stop(interaction: discord.Interaction) -> None:
 async def skip(interaction: discord.Interaction) -> None:
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
+    loop_status = find_loop(interaction.guild_id)
 
     if voice_client is not None:
         if voice_client.is_playing() or voice_client.is_paused():
@@ -493,7 +522,7 @@ async def skip(interaction: discord.Interaction) -> None:
 page = 0
 
 # Calculate max page index
-def max_page():
+def max_page(song_queue):
     idx = int(len(song_queue) / 5)
     # Edge case: if queue length is 0
     if len(song_queue) == 0:
@@ -527,7 +556,8 @@ def max_page():
 #             await interaction.response.edit_message(embed=compose_queue(page), view=self)
 
 # Compose queue display embed
-def compose_queue(page):
+def compose_queue(page, guild_id):
+    song_queue = find_queue(guild_id)
     try:
         song_slice = song_queue[5 * page: 5 * page + 5]
     except IndexError:
@@ -545,6 +575,7 @@ def compose_queue(page):
     embed_queue = discord.Embed(title="📃 Queue",
         color=config.color_info)
     
+    loop_status = find_loop(guild_id)
     if loop_status == 1:
         embed_queue.description = "🔂 Jack will loop current track"
     elif loop_status == 2:
@@ -559,21 +590,22 @@ def compose_queue(page):
         else:
             embed_queue.add_field(name=f"💿 {track_number}", value=title_duration_field, inline=False)
     
-    embed_queue.set_footer(text=f"📄 {page + 1}/{max_page() + 1}\n💿 {5 * page + 1}-{5 * page + len(song_slice)}/{len(song_queue)}\n⌛ {convert_time(sum(duration_queue))}")
+    embed_queue.set_footer(text=f"📄 {page + 1}/{max_page(song_queue) + 1}\n💿 {5 * page + 1}-{5 * page + len(song_slice)}/{len(song_queue)}\n⌛ {convert_time(sum(duration_queue))}")
     return embed_queue
 
 # Actual command
 @bot.tree.command(description="Shows queue.", guilds=bot.guilds)
 async def queue(interaction: discord.Interaction, page: int) -> None:
     await interaction.response.defer(thinking=True)
+    song_queue = find_queue(interaction.guild_id) 
     # Do nothing if page number is invalid
-    if page - 1 < 0 or page - 1 > max_page():
-        await interaction.edit_original_response(content=f"🚫 Invalid page number!\nTotal {max_page() + 1} page(s).")
+    if page - 1 < 0 or page - 1 > max_page(song_queue):
+        await interaction.edit_original_response(content=f"🚫 Invalid page number!\nTotal {max_page(song_queue) + 1} page(s).")
     # Do nothing if queue is empty
     elif len(song_queue) < 1:
         await interaction.edit_original_response(content="🤷 Queue is empty!")
     else:
-        await interaction.edit_original_response(embed=compose_queue(page - 1))
+        await interaction.edit_original_response(embed=compose_queue(page - 1, interaction.guild_id))
 
 # Voice channel commands: "np"
 # Show current track and progress
@@ -581,6 +613,7 @@ async def queue(interaction: discord.Interaction, page: int) -> None:
 async def np(interaction: discord.Interaction) -> None:
     await interaction.response.defer(thinking=True)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
 
     if voice_client is not None and len(song_queue) >= 1:
         # Calculate time elapsed
@@ -623,9 +656,10 @@ async def np(interaction: discord.Interaction) -> None:
 async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int]) -> None:
     await interaction.response.defer(thinking=True)
     voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id) 
 
-    global loop_status
-    loop_status = mode.value
+    guild_entry = find_guild(interaction.guild_id)
+    guild_entry['loop'] = mode.value
 
     response_titles = ["▶️ Loop canceled!", "🔂 Loop track enabled!", "🔁 Loop queue enabled!"]
     embed_loop = discord.Embed(title=response_titles[mode.value], color=config.color_success)
