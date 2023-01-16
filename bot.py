@@ -380,15 +380,19 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     song_queue = find_queue(interaction.guild_id) 
     # Add url to queue
     if is_supported(url):
-        # song_queue.append(url)
-        # title_queue.append(get_title(url))
-        # duration_queue.append(get_title(url, 'duration'))
-        new_song = {
-            "url": url,
-            "title": get_title(url),
-            "duration": get_title(url, 'duration')
-        }
-        song_queue.append(new_song)
+        try:
+            new_song = {
+                "url": url,
+                "title": get_title(url),
+                "duration": get_title(url, 'duration')
+            }
+            song_queue.append(new_song)
+        except:
+            embed_blocked = discord.Embed(title="🚫 Link blocked by YouTube!",
+                description="Age restricted/copyright claimed videos are not supported.",
+                color=config.color_failure)
+            await interaction.edit_original_response(embed=embed_blocked)
+            return
     else:
         await interaction.edit_original_response(content="🚫 Invalid YouTube link!")
         return
@@ -572,6 +576,28 @@ def max_page(song_queue):
 #             page += 1
 #             await interaction.response.edit_message(embed=compose_queue(page), view=self)
 
+# Compose page flip buttons
+class Page(discord.ui.View):
+    def __init__(self, *, timeout=180, song_queue=[], page=0, guild_id=0):
+        super().__init__(timeout=timeout)
+        self.song_queue = song_queue
+        self.page = page
+        self.guild_id = guild_id
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.gray)
+    async def previous_button(self,interaction:discord.Interaction, button:discord.ui.Button):
+        if self.page <= 0:
+            await interaction.response.send_message("🚫 You are already at the first page!", ephemeral=True)
+        else:
+            self.page -= 1
+            await interaction.response.edit_message(embed=compose_queue(self.page, self.guild_id), view=self)
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray)
+    async def next_button(self,interaction:discord.Interaction, button:discord.ui.Button):
+        if self.page >= max_page(self.song_queue):
+            await interaction.response.send_message("🚫 You are already at the last page!", ephemeral=True)
+        else:
+            self.page += 1
+            await interaction.response.edit_message(embed=compose_queue(self.page, self.guild_id), view=self)
+
 # Compose queue display embed
 def compose_queue(page, guild_id):
     song_queue = find_queue(guild_id)
@@ -622,7 +648,7 @@ async def queue(interaction: discord.Interaction, page: int) -> None:
     elif len(song_queue) < 1:
         await interaction.edit_original_response(content="🤷 Queue is empty!")
     else:
-        await interaction.edit_original_response(embed=compose_queue(page - 1, interaction.guild_id))
+        await interaction.edit_original_response(embed=compose_queue(page - 1, interaction.guild_id), view=Page(song_queue=song_queue, page=page - 1, guild_id=interaction.guild_id))
 
 # Voice channel commands: "np"
 # Show current track and progress
