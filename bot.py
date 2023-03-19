@@ -2,7 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import youtube_dl
+import yt_dlp as youtube_dl
 
 import os
 import time
@@ -87,6 +87,7 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn',
 }
 
