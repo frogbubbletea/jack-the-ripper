@@ -276,6 +276,8 @@ def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
                 embed_play.description = "🔂 Jack will loop this track"
             elif loop_status == 2:
                 embed_play.description = "🔁 Jack will loop the queue"
+            elif loop_status == 3:
+                embed_play.description = "🔀 Shuffle play enabled"
         embed_play.add_field(name="💿 Track", value=f"[{song_title}]({url})", inline=False)
     else:  # Clear queue confirmation
         embed_play.add_field(name="🚽 Queue cleared!", value="\u200b", inline=False)
@@ -323,9 +325,14 @@ async def play_next(interaction, start_queue=True):
             song_queue.pop(0)
         elif loop_status == 1:  # Repeat track
             pass
-        else:  # Move track to end of queue
+        elif loop_status == 2:  # Move track to end of queue
             song_queue.append(song_queue[0])
             song_queue.pop(0)
+        elif loop_status == 3:  # Move random track to front, play it
+            track_chosen = random.randrange(len(song_queue))
+            song_queue[0] = song_queue[track_chosen]
+            song_queue.pop(track_chosen)
+
     # Play track
     voice_client = check_bot_in_voice(interaction)
     if len(song_queue) >= 1:
@@ -584,17 +591,17 @@ class Page(discord.ui.View):
         self.song_queue = song_queue
         self.page = page
         self.guild_id = guild_id
-    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="⬅️ Previous page", style=discord.ButtonStyle.gray)
     async def previous_button(self,interaction:discord.Interaction, button:discord.ui.Button):
         if self.page <= 0:
-            await interaction.response.send_message("🚫 You are already at the first page!", ephemeral=True)
+            await interaction.response.send_message("🚫 You're already at the first page!", ephemeral=True)
         else:
             self.page -= 1
             await interaction.response.edit_message(embed=compose_queue(self.page, self.guild_id), view=self)
-    @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="➡️ Next page", style=discord.ButtonStyle.gray)
     async def next_button(self,interaction:discord.Interaction, button:discord.ui.Button):
         if self.page >= max_page(self.song_queue):
-            await interaction.response.send_message("🚫 You are already at the last page!", ephemeral=True)
+            await interaction.response.send_message("🚫 You're already at the last page!", ephemeral=True)
         else:
             self.page += 1
             await interaction.response.edit_message(embed=compose_queue(self.page, self.guild_id), view=self)
@@ -624,6 +631,8 @@ def compose_queue(page, guild_id):
         embed_queue.description = "🔂 Jack will loop current track"
     elif loop_status == 2:
         embed_queue.description = "🔁 Jack will loop this queue"
+    elif loop_status == 3:
+        embed_queue.description = "🔀 Shuffle play enabled"
 
     for i in range(len(song_slice)):
         # title_duration_field = f"{title_slice[i]}" + " (" + str(duration_slice[i]) + ")"
@@ -714,6 +723,35 @@ async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int])
     if voice_client is not None:
         embed_loop.set_footer(text=f"🔊 {voice_client.channel.name}")
     await interaction.edit_original_response(embed=embed_loop)
+
+# Voice channel commands: "shuffle"
+# Shuffle queue in true pseudorandom order
+@bot.tree.command(description="Shuffle queue in actual random order!", guilds=bot.guilds)
+async def shuffle(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(thinking=True)
+    voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id)
+
+    guild_entry = find_guild(interaction.guild_id)
+    # Toggle shuffle
+    # Loop status set to 3 when shuffle mode is on
+    if guild_entry['loop'] != 3:
+        guild_entry['loop'] = 3
+        confirmation_msg = "ena"
+    else:
+        guild_entry['loop'] = 0
+        confirmation_msg = "disa"
+    
+    # Compose confirmation message
+    embed_shuffle = discord.Embed(title=f"🔀 Shuffle play {confirmation_msg}bled!",
+                                  color=config.color_success)
+    
+    # Display bot's current voice channel
+    if voice_client is not None:
+        embed_shuffle.set_footer(text=f"🔊 {voice_client.channel.name}")
+    
+    await interaction.edit_original_response(embed=embed_shuffle)
+
 # Slash commands end
 
 # Text commands start
