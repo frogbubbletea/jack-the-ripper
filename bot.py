@@ -153,7 +153,7 @@ async def test(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(random.choice(test_messages))
 
 # "succ" command
-@bot.tree.command(description="Consumes the last message in the channel.", guilds=bot.guilds)
+@bot.tree.command(description="Consume the last message in the channel!", guilds=bot.guilds)
 async def succ(interaction: discord.Interaction) -> None:
     # Get message to be copied and deleted
     messages = [message async for message in interaction.channel.history(limit=1)]
@@ -219,7 +219,7 @@ async def succ(interaction: discord.Interaction) -> None:
 
 # "headpat" command
 # Give bot a headpat
-@bot.tree.command(description="Gives Jack a headpat.", guilds=bot.guilds)
+@bot.tree.command(description="Give Jack a headpat!", guilds=bot.guilds)
 async def headpat(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("You give Jack a headpat. Jack seems happy.")
     await interaction.channel.send("https://tenor.com/view/link-zelda-games-gif-5585640")
@@ -273,9 +273,9 @@ def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
     if play_type in [0, 1, 2, 4]:
         if play_type == 0:
             if loop_status == 1:
-                embed_play.description = "🔂 Jack will loop this track"
+                embed_play.description = "🔂 Loop track enabled"
             elif loop_status == 2:
-                embed_play.description = "🔁 Jack will loop the queue"
+                embed_play.description = "🔁 Loop queue enabled"
             elif loop_status == 3:
                 embed_play.description = "🔀 Shuffle play enabled"
         embed_play.add_field(name="💿 Track", value=f"[{song_title}]({url})", inline=False)
@@ -346,7 +346,7 @@ async def play_next(interaction, start_queue=True):
 
 # Voice channel commands: "join"
 # Join/move to user's voice channel if they are in one
-@bot.tree.command(description="Makes Jack join your voice channel.", guilds=bot.guilds)
+@bot.tree.command(description="Make Jack join your voice channel!", guilds=bot.guilds)
 async def join(interaction: discord.Interaction) -> None:
     vc_status = await join_voice(interaction)
     voice_client = check_bot_in_voice(interaction)
@@ -360,13 +360,13 @@ async def join(interaction: discord.Interaction) -> None:
     messages = ["🤷 Jack is already in your voice channel!", 
         f"🔊 Joined voice channel `{vc_name}`!", 
         f"🏃 Moved to voice channel `{vc_name}`!",
-        "🤷 You are not in a voice channel!"]
+        "🤷 You're not in a voice channel!"]
     
     await interaction.response.send_message(messages[vc_status])
 
 # Voice channel commands: "leave"
 # Leave user's voice channel if they are in one, and clear queue
-@bot.tree.command(description="Clears the queue, and makes Jack leave your voice channel.", guilds=bot.guilds)
+@bot.tree.command(description="Clear the queue and make Jack leave your voice channel!", guilds=bot.guilds)
 async def leave(interaction: discord.Interaction) -> None:
     song_queue = find_queue(interaction.guild_id) 
     # Clear queue
@@ -382,7 +382,7 @@ async def leave(interaction: discord.Interaction) -> None:
 
 # Voice channel commands: "play"
 # Play (stream) audio from YouTube
-@bot.tree.command(description="Plays audio from YouTube. Shorts and playlists are not supported!", guilds=bot.guilds)
+@bot.tree.command(description="Play audio from YouTube. Shorts and playlists are not supported!", guilds=bot.guilds)
 async def play(interaction: discord.Interaction, url: str) -> None:
     await interaction.response.defer(thinking=True)
     song_queue = find_queue(interaction.guild_id) 
@@ -409,7 +409,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     voice_client = check_bot_in_voice(interaction)
 
     if user_vc is None:
-        await interaction.edit_original_response(content="🤷 You are not in a voice channel!")
+        await interaction.edit_original_response(content="🤷 You're not in a voice channel!")
         return
     elif (voice_client is None) or not (voice_client.is_playing() or voice_client.is_paused()):  # Start queue
         await join_voice(interaction)
@@ -420,7 +420,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
 
 # Voice channel commands: "search"
 # Search on YouTube
-@bot.tree.command(description="Searches YouTube using keyword specified", guilds=bot.guilds)
+@bot.tree.command(description="Search a track and play it!", guilds=bot.guilds)
 async def search(interaction: discord.Interaction, keyword: str) -> None:
     await interaction.response.defer(thinking=True)
     song_queue = find_queue(interaction.guild_id) 
@@ -439,7 +439,7 @@ async def search(interaction: discord.Interaction, keyword: str) -> None:
         voice_client = check_bot_in_voice(interaction)
 
         if user_vc is None:
-            await interaction.edit_original_response(content="🤷 You are not in a voice channel!")
+            await interaction.edit_original_response(content="🤷 You're not in a voice channel!")
             return
         elif (voice_client is None) or not (voice_client.is_playing() or voice_client.is_paused()):  # Start queue
             await join_voice(interaction)
@@ -452,7 +452,7 @@ async def search(interaction: discord.Interaction, keyword: str) -> None:
 
 # Voice channel commands: "pause"
 # Pause bot
-@bot.tree.command(description="Pauses playback.", guilds=bot.guilds)
+@bot.tree.command(description="Pause playback!", guilds=bot.guilds)
 async def pause(interaction: discord.Interaction) -> None:
     global pause_time
     user_vc = check_voice_channel(interaction)
@@ -474,7 +474,7 @@ async def pause(interaction: discord.Interaction) -> None:
 
 # Voice channel commands: "resume"
 # Resume playback
-@bot.tree.command(description="Resumes playback.", guilds=bot.guilds)
+@bot.tree.command(description="Resume playback!", guilds=bot.guilds)
 async def resume(interaction: discord.Interaction) -> None:
     global pause_time
     global start_time
@@ -498,7 +498,7 @@ async def resume(interaction: discord.Interaction) -> None:
 
 # Voice channel commands: "stop"
 # Stop playback
-@bot.tree.command(description="Stops playback and clears the queue.", guilds=bot.guilds)
+@bot.tree.command(description="Stop playback and clear the queue!", guilds=bot.guilds)
 async def stop(interaction: discord.Interaction) -> None:
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
@@ -521,7 +521,7 @@ async def stop(interaction: discord.Interaction) -> None:
 
 # Voice channel commands: "skip"
 # Skip to next track in queue
-@bot.tree.command(description="Skips to next track in queue.", guilds=bot.guilds)
+@bot.tree.command(description="Skip to next track in queue!", guilds=bot.guilds)
 async def skip(interaction: discord.Interaction) -> None:
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
@@ -607,8 +607,9 @@ class Page(discord.ui.View):
             await interaction.response.edit_message(embed=compose_queue(self.page, self.guild_id), view=self)
 
 # Compose queue display embed
-def compose_queue(page, guild_id):
+def compose_queue(page, guild_id, vc_name=""):
     song_queue = find_queue(guild_id)
+    
     try:
         song_slice = song_queue[5 * page: 5 * page + 5]
     except IndexError:
@@ -628,9 +629,9 @@ def compose_queue(page, guild_id):
     
     loop_status = find_loop(guild_id)
     if loop_status == 1:
-        embed_queue.description = "🔂 Jack will loop current track"
+        embed_queue.description = "🔂 Loop track enabled"
     elif loop_status == 2:
-        embed_queue.description = "🔁 Jack will loop this queue"
+        embed_queue.description = "🔁 Loop queue enabled"
     elif loop_status == 3:
         embed_queue.description = "🔀 Shuffle play enabled"
 
@@ -643,14 +644,16 @@ def compose_queue(page, guild_id):
         else:
             embed_queue.add_field(name=f"💿 {track_number}", value=title_duration_field, inline=False)
     
-    embed_queue.set_footer(text=f"📄 {page + 1}/{max_page(song_queue) + 1}\n💿 {5 * page + 1}-{5 * page + len(song_slice)}/{len(song_queue)}\n⌛ {convert_time(sum(duration_queue))}")
+    embed_queue.set_footer(text=f"📄 Page {page + 1} of {max_page(song_queue) + 1}\n💿 Track {5 * page + 1}-{5 * page + len(song_slice)} of {len(song_queue)}\n⌛ {convert_time(sum(duration_queue))}")
+    embed_queue.set_author(name=f"🔊 {vc_name}")
     return embed_queue
 
 # Actual command
-@bot.tree.command(description="Shows queue.", guilds=bot.guilds)
+@bot.tree.command(description="Show queue!", guilds=bot.guilds)
 async def queue(interaction: discord.Interaction, page: int) -> None:
     await interaction.response.defer(thinking=True)
     song_queue = find_queue(interaction.guild_id) 
+    voice_client = check_bot_in_voice(interaction)
     # Do nothing if page number is invalid
     if page - 1 < 0 or page - 1 > max_page(song_queue):
         await interaction.edit_original_response(content=f"🚫 Invalid page number!\nTotal {max_page(song_queue) + 1} page(s).")
@@ -658,11 +661,21 @@ async def queue(interaction: discord.Interaction, page: int) -> None:
     elif len(song_queue) < 1:
         await interaction.edit_original_response(content="🤷 Queue is empty!")
     else:
-        await interaction.edit_original_response(embed=compose_queue(page - 1, interaction.guild_id), view=Page(song_queue=song_queue, page=page - 1, guild_id=interaction.guild_id))
+        await interaction.edit_original_response(
+            embed=compose_queue(
+                page - 1, 
+                interaction.guild_id,
+                voice_client.channel.name
+            ), 
+            view=Page(song_queue=song_queue, 
+                page=page - 1, 
+                guild_id=interaction.guild_id
+            )
+        )
 
 # Voice channel commands: "np"
 # Show current track and progress
-@bot.tree.command(description="Shows current track.", guilds=bot.guilds)
+@bot.tree.command(description="Show current track!", guilds=bot.guilds)
 async def np(interaction: discord.Interaction) -> None:
     await interaction.response.defer(thinking=True)
     voice_client = check_bot_in_voice(interaction)
@@ -700,11 +713,11 @@ async def np(interaction: discord.Interaction) -> None:
         
 # Voice channel commands: "loop"
 # Loop current track/queue
-@bot.tree.command(description="Makes Jack loop current track/queue.", guilds=bot.guilds)
+@bot.tree.command(description="Make Jack loop current track/queue!", guilds=bot.guilds)
 @app_commands.choices(mode=[
     app_commands.Choice(name='track', value=1),
     app_commands.Choice(name='queue', value=2),
-    app_commands.Choice(name='cancel', value=0)
+    app_commands.Choice(name='off', value=0)
 ])
 async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int]) -> None:
     await interaction.response.defer(thinking=True)
@@ -714,7 +727,7 @@ async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int])
     guild_entry = find_guild(interaction.guild_id)
     guild_entry['loop'] = mode.value
 
-    response_titles = ["▶️ Loop canceled!", "🔂 Loop track enabled!", "🔁 Loop queue enabled!"]
+    response_titles = ["▶️ Loop disabled!", "🔂 Loop track enabled!", "🔁 Loop queue enabled!"]
     embed_loop = discord.Embed(title=response_titles[mode.value], color=config.color_success)
 
     if mode.value == 1 and len(song_queue) >= 1:
