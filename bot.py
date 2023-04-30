@@ -721,8 +721,20 @@ async def np(interaction: discord.Interaction) -> None:
 ])
 async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int]) -> None:
     await interaction.response.defer(thinking=True)
+
+    user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
     song_queue = find_queue(interaction.guild_id) 
+
+    # Do nothing if Jack is not in a voice channel
+    if voice_client is None:
+        await interaction.edit_original_response(content="🤷 Jack is not in a voice channel!")
+        return
+    
+    # Do nothing if user is not in current voice channel
+    if user_vc is not voice_client.channel:
+        await interaction.edit_original_response(content="🚫 You must be in the same voice channel as Jack to control queue!")
+        return
 
     guild_entry = find_guild(interaction.guild_id)
     guild_entry['loop'] = mode.value
@@ -742,8 +754,20 @@ async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int])
 @bot.tree.command(description="Shuffle queue in actual random order!", guilds=bot.guilds)
 async def shuffle(interaction: discord.Interaction) -> None:
     await interaction.response.defer(thinking=True)
+
+    user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
     song_queue = find_queue(interaction.guild_id)
+
+    # Do nothing if Jack is not in a voice channel
+    if voice_client is None:
+        await interaction.edit_original_response(content="🤷 Jack is not in a voice channel!")
+        return
+    
+    # Do nothing if user is not in current voice channel
+    if user_vc is not voice_client.channel:
+        await interaction.edit_original_response(content="🚫 You must be in the same voice channel as Jack to control queue!")
+        return
 
     guild_entry = find_guild(interaction.guild_id)
     # Toggle shuffle
@@ -764,6 +788,180 @@ async def shuffle(interaction: discord.Interaction) -> None:
         embed_shuffle.set_footer(text=f"🔊 {voice_client.channel.name}")
     
     await interaction.edit_original_response(embed=embed_shuffle)
+
+# Voice channel commands: "remove"
+# Remove a track from the queue
+@bot.tree.command(description="Remove a track from the queue!", guilds=bot.guilds)
+async def remove(interaction: discord.Interaction, track_number: int) -> None:
+    await interaction.response.defer(thinking=True)
+
+    user_vc = check_voice_channel(interaction)
+    voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id)
+
+    # Do nothing if Jack is not in a voice channel
+    if voice_client is None:
+        await interaction.edit_original_response(content="🤷 Jack is not in a voice channel!")
+        return
+    
+    # Do nothing if user is not in current voice channel
+    if user_vc is not voice_client.channel:
+        await interaction.edit_original_response(content="🚫 You must be in the same voice channel as Jack to control queue!")
+        return
+
+    # Do nothing if queue is empty
+    if len(song_queue) < 1:
+        await interaction.edit_original_response(content="🤷 Queue is empty!")
+
+    # Do nothing if track number is invalid
+    # Currently playing track (track 1 to user) is not removable
+    elif (track_number < 2) or (track_number > len(song_queue)):
+        await interaction.edit_original_response(content=f"🚫 Invalid track number!")
+    
+    else:
+        # Get info for confirmation message
+        removed_url = song_queue[track_number - 1]['url']
+        removed_title = song_queue[track_number - 1]['title']
+
+        # Remove the track from queue
+        song_queue.pop(track_number - 1)
+
+        # Compose confirmation message
+        embed_remove = discord.Embed(
+            title="🚮 Removed from queue!",
+            color=config.color_success
+        )
+        embed_remove.add_field(
+            name=f"💿 {track_number}",
+            value=f"[{removed_title}]({removed_url})",
+            inline=False
+        )
+
+        # Add bot's current voice channel to confirmation message
+        if voice_client is not None:
+            embed_remove.set_footer(text=f"🔊 {voice_client.channel.name}")
+        
+        # Send the confirmation message
+        await interaction.edit_original_response(embed=embed_remove)
+
+# Voice channel commands: "swap"
+# Swap two tracks in queue
+@bot.tree.command(description="Swap two tracks in the queue!", guilds=bot.guilds)
+async def swap(interaction: discord.Interaction, track_one: int, track_two: int) -> None:
+    await interaction.response.defer(thinking=True)
+
+    user_vc = check_voice_channel(interaction)
+    voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id)
+
+    # Do nothing if Jack is not in a voice channel
+    if voice_client is None:
+        await interaction.edit_original_response(content="🤷 Jack is not in a voice channel!")
+        return
+    
+    # Do nothing if user is not in current voice channel
+    if user_vc is not voice_client.channel:
+        await interaction.edit_original_response(content="🚫 You must be in the same voice channel as Jack to control queue!")
+        return
+    
+    # Do nothing if queue is empty
+    if len(song_queue) < 1:
+        await interaction.edit_original_response(content="🤷 Queue is empty!")
+
+    # Do nothing if track number is invalid
+    # Currently playing track (track 1 to user) is not swappable
+    elif track_one not in range(2, len(song_queue) + 1) or track_two not in range(1, len(song_queue) + 1):
+        await interaction.edit_original_response(content=f"🚫 Invalid track number!")
+    
+    else:
+        # Compose confirmation message
+        embed_swap = discord.Embed(
+            title="🔃 Swapped tracks!",
+            color=config.color_success
+        )
+        embed_swap.add_field(
+            name="Swapped",
+            value=f"{track_one} -> **{track_two}**: [{song_queue[track_one - 1]['title']}]({song_queue[track_one - 1]['url']})",
+            inline=False
+        )
+        embed_swap.add_field(
+            name="With",
+            value=f"{track_two} -> **{track_one}**: [{song_queue[track_two - 1]['title']}]({song_queue[track_two - 1]['url']})",
+            inline=False
+        )
+        
+        # Store track one in temp variable
+        temp = song_queue[track_one - 1]
+        # Move track two to track one's index
+        song_queue[track_one - 1] = song_queue[track_two - 1]
+        # Restore track one to track two's index
+        song_queue[track_two - 1] = temp
+
+        # Add bot's current voice channel to confirmation message
+        if voice_client is not None:
+            embed_swap.set_footer(text=f"🔊 {voice_client.channel.name}")
+        
+        # Send the confirmation message
+        await interaction.edit_original_response(embed=embed_swap)
+
+# Voice channel commands: "move"
+# Move a track in queue
+@bot.tree.command(description="Move a track to another position!", guilds=bot.guilds)
+async def move(interaction: discord.Interaction, track_number: int, position: int) -> None:
+    await interaction.response.defer(thinking=True)
+
+    user_vc = check_voice_channel(interaction)
+    voice_client = check_bot_in_voice(interaction)
+    song_queue = find_queue(interaction.guild_id)
+
+    # Do nothing if Jack is not in a voice channel
+    if voice_client is None:
+        await interaction.edit_original_response(content="🤷 Jack is not in a voice channel!")
+        return
+    
+    # Do nothing if user is not in current voice channel
+    if user_vc is not voice_client.channel:
+        await interaction.edit_original_response(content="🚫 You must be in the same voice channel as Jack to control queue!")
+        return
+
+    # Do nothing if queue is empty
+    if len(song_queue) < 1:
+        await interaction.edit_original_response(content="🤷 Queue is empty!")
+    
+    # Do nothing if track number is invalid
+    # Currently playing track (track 1 to user) is not movable
+    elif track_number not in range(2, len(song_queue) + 1) or position not in range(2, len(song_queue) + 1):
+        await interaction.edit_original_response(content=f"🚫 Invalid track number!")
+    
+    else:
+        # Compose confirmation message
+        embed_move = discord.Embed(
+            title="🫴 Moved track!",
+            color=config.color_success
+        )
+        embed_move.add_field(
+            name="💿 Moved",
+            value=f"{track_number}: [{song_queue[track_number - 1]['title']}]({song_queue[track_number - 1]['url']})",
+            inline=False
+        )
+        embed_move.add_field(
+            name="To position",
+            value=f"{position}",
+            inline=False
+        )
+
+        # Insert track to specified position
+        song_queue.insert(position - 1, song_queue[track_number - 1])
+        # Remove track from original position
+        # All tracks after specified position are moved backward by 1!
+        song_queue.pop(track_number)
+
+        # Add bot's current voice channel to confirmation message
+        if voice_client is not None:
+            embed_move.set_footer(text=f"🔊 {voice_client.channel.name}")
+        
+        # Send the confirmation message
+        await interaction.edit_original_response(embed=embed_move)
 
 # Slash commands end
 
