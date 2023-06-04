@@ -121,7 +121,7 @@ def add_queue(guild):
     queue_guild = {
             'id': guild.id,
             'loop': 0,
-            'voteskip': 0,
+            'voteskip': [],
             'queue': []
         }
     song_queues.append(queue_guild)
@@ -258,20 +258,28 @@ async def join_voice(interaction):
         return -1
 
 # Compose playback method confirmation message
-def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
+# url: URL of the track
+# song_title: title of the track
+# vc_name: name of the current voice channel
+# play_type: type of message to send
+# num_skip: number of votes required to skip, play type 5 only
+def play_msg(interaction, url="", song_title="", vc_name="", play_type=0, num_skip=0):
     loop_status = find_loop(interaction.guild_id)
+    guild_entry = find_guild(interaction.guild_id)
+
     titles = ["▶️ Started playing!", 
         "⏸️ Paused!", 
         "⏯️ Resumed!",
         "⏹️ Stopped!",
-        "⏭️ Skipped!"]
+        "⏭️ Skipped!",
+        "✋ Voted to skip!"]
     
-    colors = [config.color_success, config.color_warning, config.color_success, config.color_failure, config.color_success]
+    colors = [config.color_success, config.color_warning, config.color_success, config.color_failure, config.color_success, config.color_warning]
 
     embed_play = discord.Embed(title=titles[play_type],
         color=colors[play_type])
     
-    if play_type in [0, 1, 2, 4]:
+    if play_type in [0, 1, 2, 4, 5]:
         if play_type == 0:
             if loop_status == 1:
                 embed_play.description = "🔂 Loop track enabled"
@@ -279,7 +287,16 @@ def play_msg(interaction, url="", song_title="", vc_name="", play_type=0):
                 embed_play.description = "🔁 Loop queue enabled"
             elif loop_status == 3:
                 embed_play.description = "🔀 Shuffle play enabled"
+
         embed_play.add_field(name="💿 Track", value=f"[{song_title}]({url})", inline=False)
+
+        if play_type == 5:
+            embed_play.add_field(
+                name="🗳️ Votes", 
+                value=f"{len(guild_entry['voteskip'])} / {num_skip}",
+                inline=False
+            )
+
     else:  # Clear queue confirmation
         embed_play.add_field(name="🚽 Queue cleared!", value="\u200b", inline=False)
     
@@ -320,6 +337,11 @@ async def play_next(interaction, start_queue=True):
     global start_time
     song_queue = find_queue(interaction.guild_id)
     loop_status = find_loop(interaction.guild_id)
+    guild_entry = find_guild(interaction.guild_id)
+
+    # Reset skip votes
+    guild_entry['voteskip'] = []
+
     # Move queue before playing next track
     if start_queue == False and len(song_queue) >= 1:
         if loop_status == 0:
@@ -545,19 +567,48 @@ async def stop(interaction: discord.Interaction) -> None:
 async def skip(interaction: discord.Interaction) -> None:
     user_vc = check_voice_channel(interaction)
     voice_client = check_bot_in_voice(interaction)
+
+    guild_entry = find_guild(interaction.guild_id)
     song_queue = find_queue(interaction.guild_id) 
     loop_status = find_loop(interaction.guild_id)
 
     if voice_client is not None:
         if voice_client.is_playing() or voice_client.is_paused():
             if user_vc is voice_client.channel:
-                # Confirm skip
-                await interaction.response.send_message(embed=play_msg(interaction, song_queue[0]['url'], song_queue[0]['title'], voice_client.channel.name, 4))
-                # Skip to next track
-                voice_client.pause()
-                if loop_status == 1:
-                    song_queue.pop(0)
-                await play_next(interaction, False)
+                # Remove disconnected users from voteskip list
+                vc_user_list = [x.id for x in user_vc.members]
+                guild_entry['voteskip'] = [x for x in guild_entry['voteskip'] if x in vc_user_list]
+
+                # If already voted: do not add vote
+                if interaction.user.id in guild_entry['voteskip']:
+                    await interaction.response.send_message("🚫 You already voted to skip!")
+                    return
+
+                # Add vote to guild's voteskip list
+                guild_entry['voteskip'].append(interaction.user.id)
+
+                # Send vote confirm message
+                await interaction.response.send_message(
+                    embed=play_msg(
+                        interaction, 
+                        song_queue[0]['url'],
+                        song_queue[0]['title'],
+                        voice_client.channel.name,
+                        5,
+                        int(((len(user_vc.members) - 1) / 2)) + 1
+                    )
+                )
+
+                # If vote count reached half: skip
+                if len(guild_entry['voteskip']) >= int(((len(user_vc.members) - 1) / 2)) + 1:
+                    # Confirm skip
+                    await interaction.channel.send(embed=play_msg(interaction, song_queue[0]['url'], song_queue[0]['title'], voice_client.channel.name, 4))
+                    # Skip to next track
+                    voice_client.pause()
+                    if loop_status == 1:
+                        song_queue.pop(0)
+                    await play_next(interaction, False)
+                
             else:
                 await interaction.response.send_message("🚫 You must be in the same voice channel as Jack to control playback!")
         else:
