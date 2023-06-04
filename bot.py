@@ -121,6 +121,7 @@ def add_queue(guild):
     queue_guild = {
             'id': guild.id,
             'loop': 0,
+            'voteskip': 0,
             'queue': []
         }
     song_queues.append(queue_guild)
@@ -343,6 +344,17 @@ async def play_next(interaction, start_queue=True):
     else:
         voice_client.stop()
         await interaction.channel.send("🏁 No more tracks in queue!")
+        # If no track is added to queue in 3 minutes, disconnect the bot
+        end_time = 0
+        while True:
+            await asyncio.sleep(1)
+            end_time += 1
+            if voice_client.is_playing() or voice_client.is_paused():
+                return
+            if end_time == 180:  # 3 minutes
+                await voice_client.disconnect()
+                await interaction.channel.send(f"🛌 Left voice channel `{voice_client.channel.name}` due to inactivity!")
+                return
 
 # Voice channel commands: "join"
 # Join/move to user's voice channel if they are in one
