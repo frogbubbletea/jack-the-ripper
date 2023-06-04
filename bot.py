@@ -381,6 +381,14 @@ async def join(interaction: discord.Interaction) -> None:
 @bot.tree.command(description="Clear the queue and make Jack leave your voice channel!", guilds=bot.guilds)
 async def leave(interaction: discord.Interaction) -> None:
     song_queue = find_queue(interaction.guild_id) 
+    voice_client = check_bot_in_voice(interaction)
+    user_vc = check_voice_channel(interaction)
+
+    # Check if user is in the same voice channel as Jack
+    if user_vc is not voice_client.channel:
+        await interaction.response.send_message("🚫 You must be in the same voice channel as Jack to control playback!")
+        return
+
     # Clear queue
     song_queue.clear()
 
