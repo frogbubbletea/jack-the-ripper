@@ -313,9 +313,6 @@ def queue_msg(url="", song_title=""):
 
 # Check if YouTube link is valid
 def is_supported(url):
-    # Do not accept shorts links
-    if "/shorts/" in url:
-        return False
     # Do not accept playlist links
     if "/playlist" in url:
         return False
@@ -424,10 +421,11 @@ async def leave(interaction: discord.Interaction) -> None:
 
 # Voice channel commands: "play"
 # Play (stream) audio from YouTube
-@bot.tree.command(description="Play audio from YouTube. Shorts and playlists are not supported!", guilds=bot.guilds)
+@bot.tree.command(description="Play audio from YouTube. Playlists are not supported!", guilds=bot.guilds)
 async def play(interaction: discord.Interaction, url: str) -> None:
     await interaction.response.defer(thinking=True)
-    song_queue = find_queue(interaction.guild_id) 
+    song_queue = find_queue(interaction.guild_id)
+
     # Add url to queue
     if is_supported(url):
         try:
