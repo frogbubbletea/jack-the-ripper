@@ -8,6 +8,8 @@ import os
 import time
 import random
 import asyncio
+import math
+
 from dotenv import load_dotenv
 
 import config
@@ -594,12 +596,12 @@ async def skip(interaction: discord.Interaction) -> None:
                         song_queue[0]['title'],
                         voice_client.channel.name,
                         5,
-                        int(((len(user_vc.members) - 1) / 2)) + 1
+                        math.ceil(((len(user_vc.members) - 1) / 2))
                     )
                 )
 
-                # If vote count reached half: skip
-                if len(guild_entry['voteskip']) >= int(((len(user_vc.members) - 1) / 2)) + 1:
+                # If vote count is at least half: skip
+                if len(guild_entry['voteskip']) >= math.ceil(((len(user_vc.members) - 1) / 2)):  # Round up
                     # Confirm skip
                     await interaction.channel.send(embed=play_msg(interaction, song_queue[0]['url'], song_queue[0]['title'], voice_client.channel.name, 4))
                     # Skip to next track
