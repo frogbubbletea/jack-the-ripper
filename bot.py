@@ -465,9 +465,10 @@ async def search(interaction: discord.Interaction, keyword: str) -> None:
     await interaction.response.defer(thinking=True)
     song_queue = find_queue(interaction.guild_id) 
 
-    result = ytdl.extract_info(f"ytsearch: {keyword}", download=False)['entries'][0]  # YouTube search only returns 1 result anyway
+    result = ytdl.extract_info(f"ytsearch: {keyword}", download=False)['entries']  
+    if len(result) > 0:
+        result = result[0]  # YouTube search only returns 1 result anyway
 
-    if result is not None:
         new_song = {
             "url": result['webpage_url'],
             "title": result['title'],
