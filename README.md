@@ -76,7 +76,8 @@ python3 bot.py
 
 ### 📑 Known issues
 
-- Playlists and Shorts are unsupported due to a YouTube limitation! The bot will refuse links to playlists and Shorts.
+- Playlists are unsupported due to a YouTube limitation! The bot will refuse links to playlists.
+  - Shorts support has been added in v1.2.1.
 
 ### 📮 Report a problem
 
