@@ -27,6 +27,10 @@ os.chdir(dname)
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
+# Load admin's ID
+# Change it to your own ID when you run the bot!
+admin_id = 740098404688068641
+
 # Uncomment when running on replit (2/3)
 # discord.opus.load_opus("./libopus.so.0.8.0")
 
@@ -1041,14 +1045,19 @@ async def move(interaction: discord.Interaction, track_number: int, position: in
 # Text commands start
 # "sync" command
 # Syncs command tree with Discord
-@commands.guild_only()
 @bot.command()
 async def sync(ctx):
-    if ctx.author.id == 740098404688068641:
+    if ctx.author.id == admin_id:  # Owner's ID
+        # Sync global commands
         await bot.tree.sync()
-        await ctx.send("Commands synced!")
+
+        # Sync guild specific commands
+        for guild in bot.guilds:
+            await bot.tree.sync(guild=guild)
+
+        await ctx.send("👍 Commands synced!")
     else:
-        await ctx.send("Impostor! You are not the chosen one!")
+        await ctx.send("🚫 This command can only be ran by the admin!")
 # Text commands end
 
 # Uncomment when running on replit (3/3)
