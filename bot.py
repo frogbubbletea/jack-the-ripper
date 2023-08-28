@@ -27,9 +27,10 @@ os.chdir(dname)
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Load admin's ID
-# Change it to your own ID when you run the bot!
+# Load admin's ID and test server ID
+# Change it to your own IDs when you run the bot on your server!
 admin_id = 740098404688068641
+test_server_id = 958651015064854548
 
 # Uncomment when running on replit (2/3)
 # discord.opus.load_opus("./libopus.so.0.8.0")
@@ -1039,6 +1040,28 @@ async def move(interaction: discord.Interaction, track_number: int, position: in
         
         # Send the confirmation message
         await interaction.edit_original_response(embed=embed_move)
+
+# "debug" command (test server only)
+# Upload bot status to Discord for remote debug
+@bot.tree.command(description="Upload bot status for debug!", guild=discord.Object(test_server_id))
+async def debug(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(thinking=True)
+
+    # Put list of guilds into txt file
+    guild_list_file = open('guild_list.txt', 'w')
+    for guild in bot.guilds:
+        guild_list_file.write(f'{guild.name}(id: {guild.id})\n')
+    guild_list_file.close()
+
+    # Send the txt file
+    await interaction.edit_original_response(content=f"🗡️ Jack is connected to {len(bot.guilds)} servers!")
+    await interaction.channel.send(file=discord.File("guild_list.txt"))
+
+    # Delete the txt file
+    try:
+        os.remove("guild_list.txt")
+    except:
+        pass
 
 # Slash commands end
 
