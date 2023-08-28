@@ -1,5 +1,5 @@
 # bot.py
-# Jack the Ripper v1.2.1
+# Jack the Ripper v1.2.2
 import discord
 from discord import app_commands
 from discord.ext import commands
