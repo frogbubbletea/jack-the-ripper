@@ -22,6 +22,8 @@ class Track:
         The duration of the track.
     uploader: :class:`str`
         Name of the uploader of the track.
+    thumbnail: :class:`str`
+        URL of the thumbnail of the track.
     """
     def __init__(self, adder: discord.Member, url: str):
         """
@@ -44,15 +46,16 @@ class Track:
 
         # Get track from URL
         try:
-            with yt_dlp.YouTubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 info = ydl.sanitize_info(info)  # Ensure info is a dict
 
                 # Initialize attributes after track is found
                 self.url: str = url
                 self.title: str = info["title"]
-                self.duration: int = info.get["duration"]
-                self.uploader: str = info.get["uploader"]
+                self.duration: int = info["duration"]
+                self.uploader: str = info["uploader"]
+                self.thumbnail: str = info["thumbnail"]
         except Exception as e:  # Rethrow class initialization exception
             raise
 
