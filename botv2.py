@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from config import colores, ydl_opts
 from classes import Track, LoopStatus, Server
+import util
 
 # Uncomment when running on replit (1/3)
 # from keep_alive import keep_alive
@@ -156,56 +157,58 @@ async def succ(interaction: discord.Interaction) -> None:
 async def join(interaction: discord.Interaction) -> None:
     """
     Join/move to user's voice channel.
+
+    Refer to :func:`util.compose_join` for usage of status codes.
     """
     await interaction.response.defer(thinking=True)
 
     # Find profile of the user's server
     user_server: Server = servers[interaction.guild_id]
 
-    # Status codes from voice channel connection attempt
-    #   Success:
-    #       0: The bot joins the user's voice channel
-    #       1: The bot moves from another voice channel
-    #   Failure:
-    #       2: User is not in a voice channel
-    #       3: Bot is already in the same voice channel
-    #       4: Connection not attempted, unknown error
-    join_status: int = 4
-
-    # Embed color for join success/error message
-    join_color: int = colores["error"]
-
-    # Try to connect to the voice channel
+    join_status: int = 5  # Status code from voice channel connection attempt
+    # Try connecting to the voice channel
     try:
         join_status = await user_server.join_vc(interaction.user)
-        join_color = colores["play"]
-    except AttributeError:  # User not in voice channel
+    except ValueError:  # User not in voice channel
         join_status = 2
-    except ValueError:  # Bot already in the same voice channel
+    except AttributeError:  # Bot already in the same voice channel
         join_status = 3
+    except discord.ClientException:  # Bot has just been externally disconnected, must wait for reconnection timeout
+        join_status = 4
     
     # Send confirmation/error message
-    # Message selection indexed with join_status
-    msgs = [
-        "🙋 Joined your voice channel!",
-        "🏃‍♂️ Moved to your voice channel!",
-        "🤷 You're not in a voice channel!",
-        "🤷 Already in your voice channel!",
-        "⚠️ Unknown error!"
-    ]
-    # Initialize embed
-    embed_join = discord.Embed(
-        title=msgs[join_status],
-        color=join_color
-    )
-    # Configure embed
-    try:
-        if join_status in [0, 1]:  # Success
-            embed_join.set_footer(text=f"🔊 {interaction.user.voice.channel.name}")
-    except AttributeError:  # Race condition: user left voice channel before command is complete
-        pass
+    # Compose embed
+    embed_join = util.compose_join(join_status, interaction.user)
     # Send the message
     await interaction.edit_original_response(embed=embed_join)
+
+@bot.tree.command(description="Clear the queue and make Jack leave your voice channel!")
+async def leave(interaction: discord.Interaction) -> None:
+    """
+    Leave user's voice channel if user and bot are in the same voice channel.
+
+    Also resets the corresponding server's profile.
+    """
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]  # Find profile of the user's server
+
+    # Status code from voice channel disconnection attempt
+    leave_status: int = 3
+    # Attempt to disconnect
+    try:
+        leave_status = await user_server.leave(interaction.user)
+    # User is not in the same voice channel
+    except ValueError:
+        leave_status = 1
+    # Bot is not in a voice channel
+    except AttributeError:
+        leave_status = 2
+    
+    # Send confirmation/error message
+    # Compose the embed
+    embed_leave = util.compose_leave(leave_status, interaction.user)
+    # Send the message
+    await interaction.edit_original_response(embed=embed_leave)
 
 # Slash commands end
     
@@ -246,7 +249,6 @@ async def on_voice_state_update(member, before, after):
     # Check for remaining voice_client instances after disconnection
     if after.channel is None and member.id == bot.user.id:
         if user_server.voice_client is not None:
-            await user_server.voice_client.disconnect(force=True)  # Stop the voice client from attempting to reconnect
             user_server.reset()
 
 @bot.event

@@ -44,7 +44,7 @@ class Track:
                 self.title: str = info["title"]
                 self.duration: int = info.get["duration"]
         except Exception as e:  # Rethrow class initialization exception
-            raise e
+            raise
 
 class LoopStatus(Enum):
     """
@@ -128,6 +128,38 @@ class Server:
         self.shuffle_status = False
         self.voteskip_list = []
     
+    def check_same_vc(self, user: discord.Member) -> bool:
+        """
+        Check if user is in the same voice channel as the bot.
+
+        Called when a playback control requires the user to be in the same voice channel, e.g. pause, skip.
+
+        Parameters
+        -----------
+        user: :class:`discord.Member`
+            The user using the playback control.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if the user is in the same voice channel,
+            False if user is not in a voice channel, or is in a different voice channel.
+        
+        Raises
+        -------
+        AttributeError
+            The bot is not in a voice channel.
+        """
+        # Check if bot is in a voice channel
+        if self.voice_client is None:
+            raise AttributeError("Bot is not in a voice channel.")
+
+        # Check if bot and user are in the same voice channel
+        if user.voice is None or user.voice.channel is not self.voice_client.channel:
+            return False
+        else:
+            return True
+
     async def join_vc(self, user: discord.Member) -> int:
         """
         Join/move to user's voice channel.
@@ -145,16 +177,16 @@ class Server:
         
         Raises
         -------
-        AttributeError
-            User is not in a voice channel.
         ValueError
+            User is not in a voice channel.
+        AttributeError
             The bot and the user are already in the same voice channel.
         """
         # Check if user and bot is in a VC
         if (user.voice is not None) and (self.voice_client is not None):
             # Bot is already in user's VC
             if user.voice.channel is self.voice_client.channel:
-                raise ValueError("Bot and user are already in the same voice channel.")
+                raise AttributeError("Bot and user are already in the same voice channel.")
             # Bot is in another VC
             else:
                 await self.voice_client.move_to(user.voice.channel)
@@ -165,9 +197,9 @@ class Server:
             return 0
         # User is not in a VC
         else:
-            raise AttributeError("User is not in a voice channel.")
+            raise ValueError("User is not in a voice channel.")
 
-    async def leave(self, user: discord.Member) -> None:
+    async def leave(self, user: discord.Member) -> int:
         """
         Leave the user's voice channel and reset the server the user is in, including statuses and settings.
 
@@ -178,23 +210,26 @@ class Server:
         
         Returns
         --------
-        None
-            If the bot successfully leaves the user's channel.
+        :class:`int`
+            0 if the bot successfully leaves the user's channel.
         
         Raises
         -------
-        AttributeError
-            User is not in the voice channel as the bot.
         ValueError
+            User is not in the voice channel as the bot.
+        AttributeError
             The bot is not in a voice channel.
         """
-        # Check if bot is in a voice channel
-        if self.voice_client is None:
-            raise ValueError("The bot is not in a voice channel.")
-        # Check if user is in the same voice channel
-        elif (user.voice is None) or (user.voice.channel is not self.voice_client.channel):
-            raise AttributeError("User is not in the same voice channel as the bot.")
-        # Disconnect and reset
-        else:
-            await self.voice_client.disconnect()
-            self.reset()
+        # Check if bot and user are in the same voice channel
+        try:
+            # User is not in the same voice channel
+            if self.check_same_vc(user) == False:
+                raise ValueError("User is not in the same voice channel as the bot.")
+            # User is in the same voice channel: disconnect and reset
+            else:
+                await self.voice_client.disconnect()
+                self.reset()
+                return 0
+        # Bot is not in a voice channel
+        except AttributeError:
+            raise AttributeError("The bot is not in a voice channel.")
