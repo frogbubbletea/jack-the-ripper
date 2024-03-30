@@ -196,10 +196,11 @@ async def leave(interaction: discord.Interaction) -> None:
     leave_status: int = 3
     # Attempt to disconnect
     try:
-        leave_status = await user_server.leave(interaction.user)
-    # User is not in the same voice channel
-    except ValueError:
-        leave_status = 1
+        # User is not in the same voice channel
+        if user_server.check_same_vc(interaction.user) == False:
+            leave_status = 1
+        else:
+            leave_status = await user_server.leave()
     # Bot is not in a voice channel
     except AttributeError:
         leave_status = 2
@@ -209,6 +210,66 @@ async def leave(interaction: discord.Interaction) -> None:
     embed_leave = util.compose_leave(leave_status, interaction.user)
     # Send the message
     await interaction.edit_original_response(embed=embed_leave)
+
+@bot.tree.command(description="Play audio from YouTube. Playlists are not supported!")
+async def play(interaction: discord.Interaction, url: str) -> None:
+    """
+    Add a track to the server's queue. Play it immediately if it is the first track in queue.
+
+    Parameters
+    -----------
+    url: :class:`str`
+        The URL of the track.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if URL is valid
+    if not util.is_supported(url):
+        await interaction.edit_original_response(embed=util.compose_link_invalid())
+    
+    # Attempt to load the track
+    try:
+        track: Track = Track(interaction.user, url)
+    # Link blocked by YouTube
+    except Exception as e:
+        await interaction.edit_original_response(embed=util.compose_link_blocked())
+        return
+    
+    # Check if user is in a voice channel
+    if interaction.user.voice is None:  # User is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_join(2))
+        return
+    # Check if bot is in a voice channel and if user is in the same voice channel
+    try:  # Not in same voice channel
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        pass
+
+    # Make sure bot is in the same voice channel
+    try:
+        await user_server.join_vc(interaction.user)
+    except ValueError:  # User left before bot could join the voice channel
+        await interaction.edit_original_response(embed=util.compose_join(2))
+        return
+    except AttributeError:  # Bot is already in the same voice channel
+        pass
+    except discord.ClientException:  # Bot has just been externally disconnected, must wait for reconnection timeout
+        await interaction.edit_original_response(embed=util.compose_join(4))
+        return
+    
+    # Add track into queue
+    user_server.add_track(track)
+
+    # Start the queue if bot is not already playing
+    if not (user_server.voice_client.is_playing()) or (user_server.voice_client.is_paused()):
+        await user_server.play_next(interaction, loop=bot.loop)
+    
+    # Send confirmation message
+    await interaction.edit_original_response(embed=user_server.queue_add_msg(track))
 
 # Slash commands end
     

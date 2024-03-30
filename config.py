@@ -26,3 +26,11 @@ ydl_opts = {
     'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
     'match_filter': 'original_url!*=/shorts/'
 }
+
+ffmpeg_opts = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn',
+}
+
+# Voice channel idle timeout
+vc_timeout = 180

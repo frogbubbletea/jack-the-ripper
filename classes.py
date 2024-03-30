@@ -1,10 +1,15 @@
 from typing import List
 from enum import Enum
+import asyncio
+import random
+import time
 
 import discord
+from discord.ext import commands, tasks
 import yt_dlp
 
-from config import colores, ydl_opts
+from config import colores, ydl_opts, ffmpeg_opts, vc_timeout
+import util
 
 class Track:
     """
@@ -121,7 +126,7 @@ class Server:
         # Playback status
         self.start_time: int = 0  # Current track start time
         self.pause_time: int = 0  # Current track pause time
-        self.idle_time: int = 0  # Idle time
+        self.idle_timer: tasks.Loop = None  # Idle timeout loop
         # Session settings
         self.loop_status: LoopStatus = LoopStatus.OFF  # Loop mode
         self.shuffle_status: bool = False  # Shuffle play
@@ -131,12 +136,16 @@ class Server:
         """
         Resets all attributes of a Server instance.
         """
+        # Cancel the idle timer if any
+        if self.idle_timer is not None:
+            self.idle_timer.cancel()
+
         self.voice_client = None
         self.queue = []
         self.current_track = None
         self.start_time = 0
         self.pause_time = 0
-        self.idle_time = 0
+        self.idle_timer = None
         self.loop_status = LoopStatus.OFF
         self.shuffle_status = False
         self.voteskip_list = []
@@ -212,37 +221,252 @@ class Server:
         else:
             raise ValueError("User is not in a voice channel.")
 
-    async def leave(self, user: discord.Member) -> int:
+    async def leave(self) -> int:
         """
         Leave the user's voice channel and reset the server the user is in, including statuses and settings.
-
-        Parameters
-        -----------
-        user: :class:`discord.Member`
-            The user requesting the bot to leave their voice channel.
         
         Returns
         --------
         :class:`int`
             0 if the bot successfully leaves the user's channel.
+        """
+        await self.voice_client.disconnect()
+        self.reset()
+        return 0
+    
+    def add_track(self, track: Track) -> bool:
+        """
+        Add a track to the server's queue.
+
+        Parameters
+        -----------
+        track: :class:`Track`
+            The track to be added.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if the track is successfully added.
+        """
+        self.queue.append(track)
+        return True
+
+    def move_queue(self) -> None:
+        """
+        Move one track from the queue to the current track based on server's settings.
+
+        Normal: Assign first track in queue to current_track, remove it from queue
+        Loop track: Do not remove first track from queue
+        Loop queue: Move first track to back of queue
+        Shuffle: Assign random track to current_track
+
+        Enabling both shuffle and loop track is equivalent to enabling shuffle and loop queue.
+        """
+        # Index of the track chosen
+        # This is the first track if shuffle is off, random track if shuffle is on
+        chosen_idx: int = 0
+        if self.shuffle_status == True:
+            chosen_idx = random.randrange(len(self.queue))
+        
+        # Assign the chosen track to current_track
+        self.current_track = self.queue[chosen_idx]
+        # Remove chosen track from queue if not looping track
+        if self.loop_status != LoopStatus.TRACK:
+            self.queue.pop(chosen_idx)
+        # If looping queue and not shuffling, move chosen track (now current_track) to back of queue
+        if (self.loop_status == LoopStatus.QUEUE) and (self.shuffle_status == False):
+            self.queue.append(self.current_track)
+
+    async def idle_timer_loop(self, text_channel: discord.TextChannel) -> None:
+        """
+        Disconnect the bot from the voice channel after idling for some time.
+
+        Not meant to be called directly.
+
+        Parameters
+        -----------
+        text_channel: :class:`discord.TextChannel`
+            The text channel where the last track is requested.
+        """
+        # Idle for the specified interval
+        await asyncio.sleep(vc_timeout)
+        # Notify about disconnection
+        await text_channel.send(embed=util.compose_idle_timeout(text_channel))
+        # Disconnect
+        await self.leave()
+    
+    def idle_timer_init(self, text_channel: discord.TextChannel) -> None:
+        """
+        Start an idle timer and stores it in the server profile.
+
+        Called after the last track in queue has finished playing.
+
+        Parameters
+        -----------
+        text_channel: :class:`discord.TextChannel`
+            The text channel where the last track is requested.
+        """
+
+        idle_timer = tasks.loop(count=1)(self.idle_timer_loop)
+        self.idle_timer = idle_timer
+        self.idle_timer.start(text_channel)
+    
+    async def play_next(self, interaction: discord.Interaction, loop) -> None:
+        """
+        Plays the next song in queue. If queue is empty, start idle timer.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction that starts the playback session, usually from a `/play` command.
+        loop:
+            The event loop to repeat this function in when a track ends. Usually the bot's event loop.
+        """
+        # Reset voteskip status
+        self.voteskip_list = []
+        # Clear current track
+        self.current_track = None
+
+        # Cancel the idle timer if any
+        if (self.idle_timer is not None) and (len(self.queue) > 0):
+            self.idle_timer.cancel()
+            self.idle_timer = None
+
+        # If queue is empty, start idle timer
+        if len(self.queue) == 0:
+            self.idle_timer_init(interaction.channel)
+            # Send notification that queue is empty
+            await interaction.channel.send(embed=util.compose_queue_end(self.voice_client.channel))
+            return
+
+        # Move queue
+        self.move_queue()
+
+        # Play next track
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            data = ydl.extract_info(self.current_track.url, download=False)
+            stream_url = data['url']
+
+            self.voice_client.play(
+                discord.FFmpegPCMAudio(
+                    stream_url,
+                    **ffmpeg_opts  # Pass before_options and options
+                ),
+                after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(interaction, loop), loop)
+            )
+
+        # Record start time
+        self.start_time = time.time()
+
+        # Send confirmation message
+        await interaction.channel.send(embed=self.play_msg(mode=0))
+    
+    def queue_add_msg(self, track: Track) -> discord.Embed:
+        """
+        Compose add track confirmation message.
+
+        This function is defined in :class:`Server` because it uses its attributes.
+
+        Parameters
+        -----------
+        track: :class:`Track`
+            The track that is added.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+        # Format track info
+        format_value = f"[{track.title}]({track.url})"  # Title and URL
+        format_value += f"\n👤 `{track.uploader}` | ⏳ `{util.format_duration(track.duration)}`"  # Uploader and duration
+        format_footer = f"🙋 Added by {track.adder.display_name}"  # Adder
+        try:  # Current voice channel
+            format_footer += f"\n🔊 {self.voice_client.channel.name}"
+        except AttributeError:  # Race condition: user left voice channel before command is complete
+            pass
+
+        # Initialize embed
+        embed_queue_add = discord.Embed(
+            title="👍 Added to queue!",
+            description=format_value,
+            color=colores["play"]
+        )
+        embed_queue_add.set_footer(text=format_footer)
+
+        # Add track thumbnail
+        embed_queue_add.set_thumbnail(url=track.thumbnail)
+
+        # Return the completed embed
+        return embed_queue_add
+
+    def play_msg(self, mode: int=0) -> discord.Embed:
+        """
+        Compose playback confirmation message.
+
+        This function is defined in :class:`Server` because it uses its attributes.
+
+        Parameters
+        -----------
+        mode: :class:`int`
+            The type of playback to confirm.
+                0: Start
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
         
         Raises
         -------
         ValueError
-            User is not in the voice channel as the bot.
-        AttributeError
-            The bot is not in a voice channel.
+            The mode is invalid.
         """
-        # Check if bot and user are in the same voice channel
+
+        # Select playback type
         try:
-            # User is not in the same voice channel
-            if self.check_same_vc(user) == False:
-                raise ValueError("User is not in the same voice channel as the bot.")
-            # User is in the same voice channel: disconnect and reset
-            else:
-                await self.voice_client.disconnect()
-                self.reset()
-                return 0
-        # Bot is not in a voice channel
-        except AttributeError:
-            raise AttributeError("The bot is not in a voice channel.")
+            title = [
+                "▶️ Started playing!"
+            ][mode]
+        except IndexError:
+            raise ValueError("Invalid mode.")
+        
+        # Format track info
+        # Title and URL
+        format_desc = f"[{self.current_track.title}]({self.current_track.url})" 
+        # Uploader and duration
+        format_desc += f"\n👤 `{self.current_track.uploader}` | ⏳ `{util.format_duration(self.current_track.duration)}`"  
+        # Adder and current voice channel
+        format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n🔊 {self.voice_client.channel.name}"
+
+        # Initialize embed
+        embed_play = discord.Embed(
+            title=title,
+            description=format_desc,
+            color=colores["play"]
+        )
+
+        # Add playback settings
+        # Detect playback settings
+        embed_play_settings = ""
+        if self.loop_status == LoopStatus.TRACK:
+            embed_play_settings += "🔂 Loop track on"
+        elif self.loop_status == LoopStatus.QUEUE:
+            embed_play_settings += "🔁 Loop queue on"
+        if self.shuffle_status == True:
+            embed_play_settings += "\n🔀 Shuffle on"
+        # Insert settings to embed
+        if embed_play_settings != "":
+            embed_play.add_field(
+                name="🎛️ Settings",
+                value=embed_play_settings,
+                inline=False
+            )
+
+        # Add track thumbnail
+        embed_play.set_thumbnail(url=self.current_track.thumbnail)
+
+        # Add voice channel name
+        embed_play.set_footer(text=format_footer)
+
+        return embed_play
