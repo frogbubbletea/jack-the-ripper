@@ -12,19 +12,25 @@ class Track:
 
     Attributes
     -----------
+    adder: :class:`discord.Member`
+        The user who added the track.
     url: :class:`str`
         The URL of the track.
     title: :class:`str`
         The title of the track.
     duration: :class:`int`
         The duration of the track.
+    uploader: :class:`str`
+        Name of the uploader of the track.
     """
-    def __init__(self, url):
+    def __init__(self, adder: discord.Member, url: str):
         """
         Inits Track.
 
         Parameters
         -----------
+        adder: :class:`discord.Member`
+            The user who added the track.
         url: :class:`str`
             The URL of the track.
 
@@ -33,6 +39,9 @@ class Track:
         Exception
             Rethrows any exception during Track initialization.
         """
+        # Get the adder
+        self.adder: discord.Member = adder
+
         # Get track from URL
         try:
             with yt_dlp.YouTubeDL(ydl_opts) as ydl:
@@ -43,6 +52,7 @@ class Track:
                 self.url: str = url
                 self.title: str = info["title"]
                 self.duration: int = info.get["duration"]
+                self.uploader: str = info.get["uploader"]
         except Exception as e:  # Rethrow class initialization exception
             raise
 
