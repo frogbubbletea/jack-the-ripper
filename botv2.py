@@ -187,10 +187,10 @@ async def join(interaction: discord.Interaction) -> None:
     # Send confirmation/error message
     # Message selection indexed with join_status
     msgs = [
-        "🏃 Joined your voice channel!",
-        "🏃 Moved to your voice channel!",
+        "🙋 Joined your voice channel!",
+        "🏃‍♂️ Moved to your voice channel!",
         "🤷 You're not in a voice channel!",
-        "🤷 Jack is already in your voice channel!",
+        "🤷 Already in your voice channel!",
         "⚠️ Unknown error!"
     ]
     # Initialize embed
@@ -198,9 +198,12 @@ async def join(interaction: discord.Interaction) -> None:
         title=msgs[join_status],
         color=join_color
     )
-    # If successfully joined, display voice channel name
-    if join_status in [0, 1]:
-        embed_join.set_footer(text=f"🔊 {user_server.voice_client.channel.name}")
+    # Configure embed
+    try:
+        if join_status in [0, 1]:  # Success
+            embed_join.set_footer(text=f"🔊 {interaction.user.voice.channel.name}")
+    except AttributeError:  # Race condition: user left voice channel before command is complete
+        pass
     # Send the message
     await interaction.edit_original_response(embed=embed_join)
 
@@ -229,6 +232,22 @@ async def sync(ctx):
 
 # Uncomment when running on replit (3/3)
 # keep_alive()
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """
+    Ensures the server profile is reset properly if the bot is disconnected externally.
+
+    The bot is externally disconnected when a disconnection event occurs and the `Server.voice_client` instance is still present afterwards.
+    """
+    # Find profile of the user's server
+    user_server: Server = servers[member.guild.id]
+
+    # Check for remaining voice_client instances after disconnection
+    if after.channel is None and member.id == bot.user.id:
+        if user_server.voice_client is not None:
+            await user_server.voice_client.disconnect(force=True)  # Stop the voice client from attempting to reconnect
+            user_server.reset()
 
 @bot.event
 async def on_command_error(ctx, error):
