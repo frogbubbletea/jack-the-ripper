@@ -291,7 +291,7 @@ class Server:
         # Idle for the specified interval
         await asyncio.sleep(vc_timeout)
         # Notify about disconnection
-        await text_channel.send(embed=util.compose_idle_timeout(text_channel))
+        await text_channel.send(embed=util.compose_idle_timeout(self.voice_client.channel))
         # Disconnect
         await self.leave()
     
@@ -379,7 +379,7 @@ class Server:
         """
         # Format track info
         format_value = f"[{track.title}]({track.url})"  # Title and URL
-        format_value += f"\n👤 `{track.uploader}` | ⏳ `{util.format_duration(track.duration)}`"  # Uploader and duration
+        format_value += f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  # Uploader and duration
         format_footer = f"🙋 Added by {track.adder.display_name}"  # Adder
         try:  # Current voice channel
             format_footer += f"\n🔊 {self.voice_client.channel.name}"
@@ -435,7 +435,7 @@ class Server:
         # Title and URL
         format_desc = f"[{self.current_track.title}]({self.current_track.url})" 
         # Uploader and duration
-        format_desc += f"\n👤 `{self.current_track.uploader}` | ⏳ `{util.format_duration(self.current_track.duration)}`"  
+        format_desc += f"\n👤 {self.current_track.uploader} | ⏳ `{util.format_duration(self.current_track.duration)}`"  
         # Adder and current voice channel
         format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n🔊 {self.voice_client.channel.name}"
 

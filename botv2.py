@@ -239,7 +239,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     
     # Check if user is in a voice channel
     if interaction.user.voice is None:  # User is not in a voice channel
-        await interaction.edit_original_response(embed=util.compose_join(2))
+        await interaction.edit_original_response(embed=util.compose_join(2, interaction.user))
         return
     # Check if bot is in a voice channel and if user is in the same voice channel
     try:  # Not in same voice channel
@@ -253,12 +253,12 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     try:
         await user_server.join_vc(interaction.user)
     except ValueError:  # User left before bot could join the voice channel
-        await interaction.edit_original_response(embed=util.compose_join(2))
+        await interaction.edit_original_response(embed=util.compose_join(2, interaction.user))
         return
     except AttributeError:  # Bot is already in the same voice channel
         pass
     except discord.ClientException:  # Bot has just been externally disconnected, must wait for reconnection timeout
-        await interaction.edit_original_response(embed=util.compose_join(4))
+        await interaction.edit_original_response(embed=util.compose_join(4, interaction.user))
         return
     
     # Add track into queue
