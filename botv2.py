@@ -228,6 +228,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     # Check if URL is valid
     if not util.is_supported(url):
         await interaction.edit_original_response(embed=util.compose_link_invalid())
+        return
     
     # Attempt to load the track
     try:
