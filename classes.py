@@ -3,6 +3,7 @@ from enum import Enum
 import asyncio
 import random
 import time
+import functools
 
 import discord
 from discord.ext import commands, tasks
@@ -30,7 +31,7 @@ class Track:
     thumbnail: :class:`str`
         URL of the thumbnail of the track.
     """
-    def __init__(self, adder: discord.Member, url: str):
+    def __init__(self, adder: discord.Member, url: str, track_dict: dict=None):
         """
         Inits Track.
 
@@ -40,6 +41,8 @@ class Track:
             The user who added the track.
         url: :class:`str`
             The URL of the track.
+        track_dict: :class:`dict`
+            The dictionary containing the track's info. This will be used to initialize Track if available.
 
         Raises
         -------
@@ -49,18 +52,25 @@ class Track:
         # Get the adder
         self.adder: discord.Member = adder
 
-        # Get track from URL
+        # Get track from URL or track_dict
+        info = {}
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                info = ydl.sanitize_info(info)  # Ensure info is a dict
+                if track_dict is not None:
+                    info = ydl.sanitize_info(track_dict)
+                else:
+                    info = ydl.extract_info(url, download=False)
+                    info = ydl.sanitize_info(info)  # Ensure info is a dict
+        except Exception as e:
+            raise
 
-                # Initialize attributes after track is found
-                self.url: str = url
-                self.title: str = info["title"]
-                self.duration: int = info["duration"]
-                self.uploader: str = info["uploader"]
-                self.thumbnail: str = info["thumbnail"]
+        try:
+            # Initialize attributes after track is found
+            self.url: str = url
+            self.title: str = info["title"]
+            self.duration: int = info["duration"]
+            self.uploader: str = info["uploader"]
+            self.thumbnail: str = info["thumbnail"]
         except Exception as e:  # Rethrow class initialization exception
             raise
 
@@ -315,6 +325,9 @@ class Server:
         """
         # Idle for the specified interval
         await asyncio.sleep(vc_timeout)
+        # Do nothing if bot is already disconnected
+        if self.voice_client == None:
+            return
         # Notify about disconnection
         await text_channel.send(embed=util.compose_idle_timeout(self.voice_client.channel))
         # Disconnect
@@ -369,7 +382,10 @@ class Server:
 
         # Play next track
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            data = ydl.extract_info(self.current_track.url, download=False)
+            # Extract stream URL without blocking the bot
+            extract_func = functools.partial(ydl.extract_info, self.current_track.url, download=False)
+            data = await loop.run_in_executor(None, extract_func)
+            # data = ydl.extract_info(self.current_track.url, download=False)
             stream_url = data['url']
 
             self.voice_client.play(
@@ -621,3 +637,42 @@ class Server:
         embed_queue.set_footer(text=footer)
 
         return embed_queue
+    
+    def compose_playlist_added(self, url: str, title: str, uploader: str, len: int, len_failed: int) -> discord.Embed:
+        """
+        Compose add playlist confirmation message.
+
+        Defined as a method of :class:`Server` because it uses its attributes.
+
+        Parameters
+        -----------
+        url: :class:`str`
+            The URL of the playlist.
+        title: :class:`str`
+            The title of the playlist.
+        uploader: :class:`str`
+            The uploader of the playlist.
+        len: :class:`int`
+            The number of tracks in the playlist.
+        len_failed: :class:`int`
+            The number of tracks in the playlist that failed to load.
+        """
+
+        # Format playlist info
+        format_info = f"[{title}]({url})\n"  # Title and URL
+        format_info += f"👤 {uploader} | 💿 {len} tracks\n"  # Uploader and number of tracks
+        if len_failed > 0:  # Add missing tracks warning
+            format_info += f"ℹ️ Only {len - len_failed}/{len} tracks loaded"
+
+        # Initialize embed
+        embed_playlist_added = discord.Embed(
+            title="👍 Playlist added to queue!",
+            description=format_info,
+            color=colores["play"]
+        )
+
+        # Add footer
+        embed_playlist_added.set_footer(text=f"🔊 {self.voice_client.channel.name}")
+
+        # Return the completed embed
+        return embed_playlist_added

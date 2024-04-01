@@ -3,7 +3,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import yt_dlp as youtube_dl
+import yt_dlp
 
 import os
 import time
@@ -11,6 +11,7 @@ import random
 import asyncio
 import math
 import typing
+from typing import List
 
 from dotenv import load_dotenv
 
@@ -212,7 +213,8 @@ async def leave(interaction: discord.Interaction) -> None:
     # Send the message
     await interaction.edit_original_response(embed=embed_leave)
 
-@bot.tree.command(description="Play audio from YouTube. Playlists are not supported!")
+@bot.tree.command(description="Play audio from YouTube from URL or search keyword!")
+@app_commands.rename(url="query")
 async def play(interaction: discord.Interaction, url: str) -> None:
     """
     Add a track to the server's queue. Play it immediately if it is the first track in queue.
@@ -220,20 +222,24 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     Parameters
     -----------
     url: :class:`str`
-        The URL of the track.
+        The URL of the track, or the keyword to search for.
     """
 
     await interaction.response.defer(thinking=True)
     user_server: Server = servers[interaction.guild_id]
 
-    # Check if URL is valid
-    if util.is_supported(url) < 0:
-        await interaction.edit_original_response(embed=util.compose_link_invalid())
-        return
+    # Check if URL is valid, playlists aren't valid in this command
+    if (util.is_supported(url) < 0) or (util.is_supported(url) == 2):
+        # Perform search for keywords
+        url = await util.run_blocking(bot, util.yt_search, url)
+        # Return if no results
+        if url == "":
+            await interaction.edit_original_response(embed=util.compose_search_no_results())
+            return
     
     # Attempt to load the track
     try:
-        track: Track = Track(interaction.user, url)
+        track: Track = await util.run_blocking(bot, Track, interaction.user, url)
     # Link blocked by YouTube
     except Exception as e:
         await interaction.edit_original_response(embed=util.compose_link_blocked())
@@ -272,6 +278,90 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     
     # Send confirmation message
     await interaction.edit_original_response(embed=user_server.queue_add_msg(track))
+
+@bot.tree.command(description="Play a YouTube playlist!")
+async def playlist(interaction: discord.Interaction, url: str) -> None:
+    """
+    Add a playlist to the server's queue.
+
+    Parameters
+    -----------
+    url: :class:`str`
+        The URL of the playlist.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in a voice channel
+    if interaction.user.voice is None:  # User is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_join(2, interaction.user))
+        return
+    # Check if bot is in a voice channel and if user is in the same voice channel
+    try:  # Not in same voice channel
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        pass
+
+    # Make sure bot is in the same voice channel
+    try:
+        await user_server.join_vc(interaction.user)
+    except ValueError:  # User left before bot could join the voice channel
+        await interaction.edit_original_response(embed=util.compose_join(2, interaction.user))
+        return
+    except AttributeError:  # Bot is already in the same voice channel
+        pass
+    except discord.ClientException:  # Bot has just been externally disconnected, must wait for reconnection timeout
+        await interaction.edit_original_response(embed=util.compose_join(4, interaction.user))
+        return
+
+    # Check if URL is valid
+    if util.is_supported(url) != 2:
+        await interaction.edit_original_response(embed=util.compose_playlist_link_invalid())
+        return
+    
+    # Load the playlist from YouTube
+    # Show loading message
+    await interaction.edit_original_response(embed=util.compose_playlist_downloading())
+    # Download the playlist
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            # Don't block the bot
+            playlist_dict = await util.run_blocking(bot, ydl.extract_info, url, download=False)
+            # playlist_dict = ydl.extract_info(url, download=False)
+            playlist_dict = ydl.sanitize_info(playlist_dict)
+            # Get info about the playlist
+            playlist_title: str = playlist_dict["title"]  # Title
+            playlist_uploader: str = playlist_dict["uploader"]  # Uploader
+            playlist_len: int = playlist_dict["playlist_count"]  # No. of tracks
+            playlist_entries: List[str] = playlist_dict["entries"]  # List of tracks
+        except:
+            await interaction.edit_original_response(embed=util.compose_playlist_download_failed())
+            return
+    
+    # Update progress to the user
+    await interaction.edit_original_response(embed=util.compose_playlist_adding())
+
+    # Record no. of tracks that cannot be loaded
+    num_failed_tracks: int = 0
+
+    # Attempt to load the tracks
+    for entry in playlist_entries: 
+        try:   
+            new_track: Track = Track(interaction.user, entry["webpage_url"], entry)
+            # Add track into queue
+            user_server.add_track(new_track)
+        except Exception as e:
+            num_failed_tracks += 1
+    
+    # Start the queue if bot is not already playing
+    if not (user_server.voice_client.is_playing()) or (user_server.voice_client.is_paused()):
+        await user_server.play_next(interaction, loop=bot.loop)
+    
+    # Send confirmation message
+    await interaction.edit_original_response(embed=user_server.compose_playlist_added(url=url, title=playlist_title, uploader=playlist_uploader, len=playlist_len, len_failed=num_failed_tracks))
 
 class QueuePage(discord.ui.View):
     """

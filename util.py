@@ -8,6 +8,17 @@ import yt_dlp
 from config import colores, ydl_opts
 
 import time
+import typing
+import functools
+
+async def run_blocking(bot: discord.Client, blocking_func: typing.Callable, *args, **kwargs) -> typing.Any:
+    """
+    Runs a blocking function without blocking the bot's heartbeat.
+    https://stackoverflow.com/questions/65881761/discord-gateway-warning-shard-id-none-heartbeat-blocked-for-more-than-10-second
+    """
+
+    func = functools.partial(blocking_func, *args, **kwargs) # `run_in_executor` doesn't support kwargs, `functools.partial` does
+    return await bot.loop.run_in_executor(None, func)
 
 def format_duration(seconds: int) -> str:
     """
@@ -60,6 +71,26 @@ def is_supported(url: str) -> int:
         if e.suitable(url) and e.IE_NAME != 'generic':
             return 1
     return -1
+
+def yt_search(query: str) -> str:
+    """
+    Search for a track on YouTube.
+
+    Parameters
+    -----------
+    query: :class:`str`
+        The search term/keyword.
+    
+    Returns
+    --------
+    :class:`str`
+        The URL of the search result, or an empty string if search returns no results.
+    """
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(f"ytsearch: {query}", download=False)['entries'][0]['webpage_url']
+    except:  # No results
+        return ""
 
 def compose_join(join_status: int, user: discord.Member) -> discord.Embed:
     """
@@ -264,8 +295,8 @@ def compose_link_invalid() -> discord.Embed:
     """
 
     embed_link_invalid = discord.Embed(
-        title="🚫 Invalid YouTube link!",
-        description="Please double check your link.\n• Is it a playlist link? Playlists are not supported yet.\n• Is it a link to another website?",
+        title="⚠️ Invalid YouTube link!",
+        description="Please double check your link.\n• Is it a playlist link? Use `/playlist` instead.\n• Is it a link to another website?",
         color=colores["error"]
     )
     return embed_link_invalid
@@ -281,8 +312,8 @@ def compose_link_blocked() -> discord.Embed:
     """
 
     embed_link_blocked = discord.Embed(
-        title="🚫 Link blocked by YouTube!",
-        description="Please double check your link.\n• Is the video age-restricted?\n• Is the video copyright claimed?",
+        title="⚠️ Error loading from link!",
+        description="Please double check your link.\n• Is it a link to another website?\n• Is the video age-restricted?\n• Is the video copyright claimed?",
         color=colores["error"]
     )
     return embed_link_blocked
@@ -319,3 +350,84 @@ def compose_queue_empty() -> discord.Embed:
         color=colores["status"]
     )
     return embed_queue_empty
+
+def compose_search_no_results() -> discord.Embed:
+    """
+    Compose a message that the search returned no results.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_search_no_results = discord.Embed(
+        title="🤷 Couldn't find anything with the URL/keyword!",
+        color=colores["error"]
+    )
+    return embed_search_no_results
+
+def compose_playlist_link_invalid() -> discord.Embed:
+    """
+    Compose a message that the playlist link is invalid.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_playlist_link_invalid = discord.Embed(
+        title="⚠️ Invalid YouTube playlist link!",
+        description="Please double check your link.\n• Is it a video link/search query? Use `/play` instead.\n• Is it a link to another website?",
+        color=colores["error"]
+    )
+    return embed_playlist_link_invalid
+
+def compose_playlist_downloading() -> discord.Embed:
+    """
+    Compose a message that the bot is downloading the given playlist.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_playlist_downloading = discord.Embed(
+        title="⏳ Downloading playlist...",
+        color=colores["status"]
+    )
+    return embed_playlist_downloading
+
+def compose_playlist_download_failed() -> discord.Embed:
+    """
+    Compose a message that the playlist download failed.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_playlist_download_failed = discord.Embed(
+        title="⚠️ Failed to download playlist!",
+        color=colores["error"]
+    )
+    return embed_playlist_download_failed
+
+def compose_playlist_adding() -> discord.Embed:
+    """
+    Compose a message that the bot is adding the playlist to the queue.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_playlist_adding = discord.Embed(
+        title="⏳ Adding playlist to queue...",
+        color=colores["status"]
+    )
+    return embed_playlist_adding
