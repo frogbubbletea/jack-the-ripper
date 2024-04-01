@@ -227,7 +227,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     user_server: Server = servers[interaction.guild_id]
 
     # Check if URL is valid
-    if not util.is_supported(url):
+    if util.is_supported(url) < 0:
         await interaction.edit_original_response(embed=util.compose_link_invalid())
         return
     

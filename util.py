@@ -32,7 +32,7 @@ def format_duration(seconds: int) -> str:
         time_string = time.strftime('%H:%M:%S', time.gmtime(seconds)).lstrip('0')
     return time_string
 
-def is_supported(url: str) -> bool:
+def is_supported(url: str) -> int:
     """
     Checks if a URL is a valid YouTube link.
 
@@ -43,19 +43,23 @@ def is_supported(url: str) -> bool:
     
     Returns
     --------
-    :class:`bool`
-        True if the URL is valid, False otherwise.
+    :class:`int`
+        Valid:
+            1: The URL is a video link.
+            2: The URL is a playlist link.
+        Invalid:
+            -1: The URL is not a valid YouTube link.
     """
 
     # Do not accept playlist links
     if "/playlist" in url:
-        return False
+        return 2
 
     extractors = yt_dlp.extractor.gen_extractors()
     for e in extractors:
         if e.suitable(url) and e.IE_NAME != 'generic':
-            return True
-    return False
+            return 1
+    return -1
 
 def compose_join(join_status: int, user: discord.Member) -> discord.Embed:
     """
