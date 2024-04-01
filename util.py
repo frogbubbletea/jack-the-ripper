@@ -193,7 +193,7 @@ def compose_leave(leave_status: int, user: discord.Member) -> discord.Embed:
     # Return the completed embed
     return embed_leave
 
-def compose_idle_timeout(voice_channel: discord.VoiceChannel):
+def compose_idle_timeout(voice_channel: discord.VoiceChannel) -> discord.Embed:
     """
     Compose a message for the bot leaving a voice channel due to inactivity.
 
@@ -221,7 +221,7 @@ def compose_idle_timeout(voice_channel: discord.VoiceChannel):
     # Return the completed embed
     return embed_idle
 
-def compose_queue_end(voice_channel: discord.VoiceChannel):
+def compose_queue_end(voice_channel: discord.VoiceChannel) -> discord.Embed:
     """
     Compose a message to notify that all tracks in the queue have finished playing.
 
@@ -249,7 +249,7 @@ def compose_queue_end(voice_channel: discord.VoiceChannel):
     # Return the completed embed
     return embed_queue_end
 
-def compose_link_invalid():
+def compose_link_invalid() -> discord.Embed:
     """
     Compose a message that the given link is not a valid YouTube video link.
 
@@ -266,7 +266,7 @@ def compose_link_invalid():
     )
     return embed_link_invalid
 
-def compose_link_blocked():
+def compose_link_blocked() -> discord.Embed:
     """
     Compose a message that the given link is blocked by YouTube.
 
@@ -282,3 +282,36 @@ def compose_link_blocked():
         color=colores["error"]
     )
     return embed_link_blocked
+
+def compose_queue_invalid_page_no(no_of_pages: int) -> discord.Embed:
+    """
+    Compose a message that the given page number is invalid.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_invalid_page = discord.Embed(
+        title="⚠️ Check your page number!",
+        description=f"There are {no_of_pages} page(s) in the queue.",
+        color=colores["error"]
+    )
+    return embed_invalid_page
+
+def compose_queue_empty() -> discord.Embed:
+    """
+    Compose a message that the queue is empty.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_queue_empty = discord.Embed(
+        title="🤷 Queue is empty!",
+        color=colores["status"]
+    )
+    return embed_queue_empty

@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands, tasks
 import yt_dlp
 
-from config import colores, ydl_opts, ffmpeg_opts, vc_timeout
+from config import colores, ydl_opts, ffmpeg_opts, vc_timeout, queue_page_size
 import util
 
 class Track:
@@ -108,7 +108,7 @@ class Server:
     voteskip_list: :class:`List[int]`
         List of users in IDs who voted to skip the current track.
     """
-    def __init__(self, id):
+    def __init__(self, id: int):
         """
         Inits Server.
 
@@ -132,7 +132,7 @@ class Server:
         self.shuffle_status: bool = False  # Shuffle play
         self.voteskip_list: List[int] = []  # List of user IDs who voted to skip current track
     
-    def reset(self):
+    def reset(self) -> None:
         """
         Resets all attributes of a Server instance.
         """
@@ -150,6 +150,31 @@ class Server:
         self.shuffle_status = False
         self.voteskip_list = []
     
+    def playback_settings_to_str(self) -> str:
+        """
+        Convert playback settings to a string for visualization.
+
+        This includes loop and shuffle modes.
+
+        Called by playback and status embeds, e.g. when a track starts playing and /queue.
+
+        Returns
+        --------
+        :class:`str`
+            The playback settings string.
+        """
+
+        settings_str = ""
+
+        if self.loop_status == LoopStatus.TRACK:
+            embed_play_settings += "🔂 Loop track on"
+        elif self.loop_status == LoopStatus.QUEUE:
+            embed_play_settings += "🔁 Loop queue on"
+        if self.shuffle_status == True:
+            embed_play_settings += "\n🔀 Shuffle on"
+        
+        return settings_str
+
     def check_same_vc(self, user: discord.Member) -> bool:
         """
         Check if user is in the same voice channel as the bot.
@@ -446,22 +471,16 @@ class Server:
             color=colores["play"]
         )
 
-        # Add playback settings
-        # Detect playback settings
-        embed_play_settings = ""
-        if self.loop_status == LoopStatus.TRACK:
-            embed_play_settings += "🔂 Loop track on"
-        elif self.loop_status == LoopStatus.QUEUE:
-            embed_play_settings += "🔁 Loop queue on"
-        if self.shuffle_status == True:
-            embed_play_settings += "\n🔀 Shuffle on"
-        # Insert settings to embed
-        if embed_play_settings != "":
-            embed_play.add_field(
-                name="🎛️ Settings",
-                value=embed_play_settings,
-                inline=False
-            )
+        # Configure footer
+        # Adder
+        format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n"
+        # Playback settings
+        if (self.shuffle_status == True) or (self.loop_status != LoopStatus.OFF):
+            format_footer += f"{self.playback_settings_to_str()}\n"
+        # Current voice channel
+        format_footer += f"🔊 {self.voice_client.channel.name}"
+        # Add footer to embed
+        embed_play.set_footer(text=format_footer)
 
         # Add track thumbnail
         embed_play.set_thumbnail(url=self.current_track.thumbnail)
@@ -470,3 +489,135 @@ class Server:
         embed_play.set_footer(text=format_footer)
 
         return embed_play
+    
+    def get_last_queue_page_idx(self) -> int:
+        """
+        Get the index of the last page of the queue. This does not include the current track.
+
+        Page size is defined in `config.queue_page_size`.
+
+        Returns
+        --------
+        :class:`int`
+            The index of the last page.
+        """
+
+        idx = int(len(self.queue) / queue_page_size)
+        # If queue length is non-zero multiple of the page size, adjust number of pages accordingly
+        if (len(self.queue) != 0) and (len(self.queue) % queue_page_size == 0):
+            idx -= 1
+        return idx
+    
+    def get_one_queue_page(self, page: int) -> List[Track]:
+        """
+        Get one page of the queue.
+
+        Page size is defined in `config.queue_page_size`.
+
+        Parameters
+        -----------
+        page: :class:`int`
+            The zero-based index of the page number.
+        
+        Returns
+        --------
+        :class:`List[Track]`
+            The page of the queue.
+        
+        Raises
+        -------
+        ValueError
+            Invalid page number, i.e. `page` is negative or above the index of the last page.
+        """
+
+        # Check if page number is invalid
+        if (page < 0) or (page > self.get_last_queue_page_idx()):
+            raise ValueError("Invalid page number.")
+        
+        # Get the page
+        try:
+            queue_page = self.queue[queue_page_size * page: queue_page_size * page + queue_page_size]
+        except:  # Length of the last page may be smaller than page size
+            queue_page = self.queue[queue_page_size * page: ]
+        
+        return queue_page
+    
+    def compose_queue_page(self, page: int) -> discord.Embed:
+        """
+        Compose an embed from one page of the queue. Current track is added before the first page.
+
+        Defined as a method of :class:`Server` because it uses its attributes.
+
+        Parameters
+        -----------
+        page: :class:`int`
+            The zero-based index of the page number. If this is 0, current track will be added to the embed.
+        
+        Returns
+        --------
+        class:`discord.Embed`
+            The composed embed containing the page.
+        
+        Raises
+        -------
+        ValueError
+            Invalid page number.
+        AttributeError
+            The queue is empty and no track is playing.
+        """
+
+        # Get the page
+        try:
+            queue_page = self.get_one_queue_page(page)
+        except ValueError:
+            raise ValueError("Invalid page number.")
+        
+        # Check if queue is empty
+        if (len(self.queue) < 1) and (self.current_track is None):
+            raise AttributeError("Queue is empty and no track is playing.")
+
+        # Prepare embed
+        embed_queue = discord.Embed(
+            title="📃 Queue",
+            description=self.playback_settings_to_str(),
+            color=colores["status"]
+        )
+
+        # Add current track before first page
+        if (page == 0) and (self.current_track is not None):
+            track_info: str = f"[{self.current_track.title}]({self.current_track.url})\n{self.current_track.uploader} | ⏳ `{util.format_duration(self.current_track.duration)}`"
+            embed_queue.add_field(
+                name="▶️ Now playing",
+                value=track_info,
+                inline=False
+            )
+
+        # Add the page
+        for i in range(len(queue_page)):
+            # Get track number
+            track_no: int = queue_page_size * page + i + 1
+            # Get track field name
+            track_name: str = f"💿 {track_no}"
+            # Get track info
+            track_info: str = f"[{queue_page[i].title}]({queue_page[i].url})\n{queue_page[i].uploader} | ⏳ `{util.format_duration(queue_page[i].duration)}`"
+            # Add track to embed
+            embed_queue.add_field(
+                name=track_name,
+                value=track_info,
+                inline=False
+            )
+
+        # Format the embed
+        # Total number of pages
+        footer = f"📄 Page {page + 1} of {self.get_last_queue_page_idx() + 1}\n"
+        # Current tracks and total number of tracks
+        page_start_idx: int = 0 if page == 0 else queue_page_size * page + 1
+        footer += f"💿 Track {page_start_idx}-{queue_page_size * page + len(queue_page)} of {len(self.queue)}\n"
+        # Total play time of the queue, including current track
+        footer += f"⏳ {util.format_duration(sum(t.duration for t in self.queue + [self.current_track]))}\n"
+        # Name of current voice channel
+        footer += f"🔊 {self.voice_client.channel.name}"
+        # Add it to the embed
+        embed_queue.set_footer(text=footer)
+
+        return embed_queue

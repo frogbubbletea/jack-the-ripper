@@ -10,6 +10,7 @@ import time
 import random
 import asyncio
 import math
+import typing
 
 from dotenv import load_dotenv
 
@@ -271,6 +272,106 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     
     # Send confirmation message
     await interaction.edit_original_response(embed=user_server.queue_add_msg(track))
+
+class QueuePage(discord.ui.View):
+    """
+    A view containing buttons for the user to flip through pages of a paginated content.
+
+    Called by the /queue command.
+
+    Attributes
+    -----------
+    server: :class:`Server`
+        The server containing the paginated content.
+    """
+
+    def __init__(self, *, timeout: int=180, page: int=0, server: Server):
+        """
+        Inits the view.
+
+        Parameters
+        -----------
+        timeout: :class:`int`
+            The duration the user can use the buttons for. After that, the buttons will be disabled.
+        page: :class:`int`
+            The current displaying page.
+        server: :class:`Server`
+            The server containing the paginated content.
+        """
+
+        super().__init__(timeout=timeout)
+        self.page: int = page
+        self.server: Server = server  # Server containing the paginated content
+
+    @discord.ui.button(label="Previous page", style=discord.ButtonStyle.gray, emoji="⬅️")
+    async def previous_button(self,interaction:discord.Interaction, button:discord.ui.Button) -> None:
+        """
+        Button to go to the previous page of the paginated content.
+        """
+        # Get the embed of the previous page
+        try:
+            embed_queue_page: discord.Embed = self.server.compose_queue_page(self.page - 1)
+        except ValueError:
+            await interaction.response.send_message("⚠️ You're already at the first page!", ephemeral=True)
+            return
+        
+        # Go to the page
+        self.page -= 1
+        await interaction.response.edit_message(embed=embed_queue_page, view=self)
+    
+    @discord.ui.button(label="Next page", style=discord.ButtonStyle.gray, emoji="➡️")
+    async def next_button(self,interaction:discord.Interaction, button:discord.ui.Button):
+        """
+        Button to go to the next page of the paginated content.
+        """
+        # Get the embed of the next page
+        try:
+            embed_queue_page: discord.Embed = self.server.compose_queue_page(self.page + 1)
+        except ValueError:
+            await interaction.response.send_message("⚠️ You're already at the last page!", ephemeral=True)
+            return
+
+        # Go to the page
+        self.page += 1
+        await interaction.response.edit_message(embed=embed_queue_page, view=self)
+
+@bot.tree.command(description="Get the queue!")
+async def queue(interaction: discord.Interaction, page: typing.Optional[int]) -> None:
+    """
+    Get the queue of the user's server.
+
+    Parameters
+    -----------
+    page: :class:`Optional[int]`
+        The page number of the page to get, defaults to first page.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Set default page number
+    if page is None:
+        page = 1
+    
+    # Convert page number to 0-based
+    page -= 1
+
+    # Check page number and get the embed
+    try:
+        embed_queue_page: discord.Embed = user_server.compose_queue_page(page)
+    except ValueError:  # Invalid page number
+        no_of_pages: int = user_server.get_last_queue_page_idx() + 1
+        await interaction.edit_original_response(embed=util.compose_queue_invalid_page_no(no_of_pages))
+        return
+    except AttributeError:  # No track is playing
+        await interaction.edit_original_response(embed=util.compose_queue_empty())
+        return
+    
+    # Send the embed
+    await interaction.edit_original_response(
+        embed=embed_queue_page,
+        view=QueuePage(page=page, server=user_server)
+    )
 
 # Slash commands end
     

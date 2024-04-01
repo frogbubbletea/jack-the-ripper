@@ -27,6 +27,7 @@ ydl_opts = {
     'match_filter': 'original_url!*=/shorts/'
 }
 
+# ffmpeg options
 ffmpeg_opts = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn',
@@ -34,3 +35,6 @@ ffmpeg_opts = {
 
 # Voice channel idle timeout
 vc_timeout = 180
+
+# Size of each page when displaying the queue in an embed
+queue_page_size = 5
