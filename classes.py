@@ -805,6 +805,11 @@ class Server:
         if (len(self.queue) < 1) and (self.current_track is None):
             raise AttributeError("Queue is empty and no track is playing.")
 
+        # Check if current track is playing or paused
+        format_title = "▶️ Now playing"
+        if self.voice_client.is_paused():
+            format_title = "⏸️ Now paused"
+
         # Prepare embed
         embed_queue = discord.Embed(
             title="📃 Queue",
@@ -816,7 +821,7 @@ class Server:
         if (page == 0) and (self.current_track is not None):
             track_info: str = f"[{self.current_track.title}]({self.current_track.url})\n{self.current_track.uploader} | ⏳ `{util.format_duration(self.current_track.duration)}`"
             embed_queue.add_field(
-                name="▶️ Now playing",
+                name=format_title,
                 value=track_info,
                 inline=False
             )
