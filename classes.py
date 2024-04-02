@@ -601,6 +601,7 @@ class Server:
                 2: Skip
                 3: Pause
                 4: Resume
+                5: Remove
         track: :class:`Track`
             The track to compose the message with. Defaults to the current track.
         
@@ -626,7 +627,8 @@ class Server:
                 "🗳️ Voted to skip!",
                 "⏩ Skipped!",
                 "⏸️ Paused!",
-                "▶️ Resumed!"
+                "▶️ Resumed!",
+                "🚮 Removed from queue!"
             ][mode]
         except IndexError:
             raise ValueError("Invalid mode.")
@@ -1080,7 +1082,11 @@ class Server:
         desc: str = f"👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`\n"  # Uploader and duration
         desc += f"From 💿 {track_idx + 1} to 💿 {pos_idx + 1}"  # Track numbers
 
-        footer = f"🙋 Moved by {interaction.user.display_name}\n"  # Name of the user who performed the move
+        # Name of the user who performed the move
+        footer = f"🙋 Moved by {interaction.user.display_name}\n"  
+        # Playback settings
+        if (self.shuffle_status == True) or (self.loop_status != LoopStatus.OFF):
+            footer += f"{self.playback_settings_to_str()}\n"
         footer += f"🔊 {self.voice_client.channel.name}"
 
         # Initialize embed
@@ -1134,52 +1140,6 @@ class Server:
             return track
         except IndexError:
             raise ValueError("Invalid track index.")
-    
-    def compose_remove_track(self, interaction: discord.Interaction, track: Track) -> discord.Embed:
-        """
-        Compose remove track confirmation message.
-
-        This function is defined in :class:`Server` because it uses its queue.
-
-        Called after removing the track.
-
-        Parameters
-        -----------
-        interaction: :class:`discord.Interaction`
-            The interaction containing the user who performed the move.
-        track: :class:`Track`
-            The track that is removed. returned from `remove_track()`.
-        
-        Returns
-        --------
-        :class:`discord.Embed`
-            The embed containing the message to send.
-        """
-
-        # Format track info
-        desc: str = f"👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`\n"  # Uploader and duration
-        
-        footer = f"🙋 Removed by {interaction.user.display_name}\n"
-        footer += f"🔊 {self.voice_client.channel.name}"
-
-        # Initialize embed
-        embed_remove: discord.Embed = discord.Embed(
-            title=track.title,
-            url=track.url,
-            description=desc,
-            color=colores["play"]
-        )
-
-        # Set title
-        embed_remove.set_author(name="🚮 Removed from queue!")
-
-        # Set thumbnail
-        embed_remove.set_thumbnail(url=track.thumbnail)
-
-        # Add footer
-        embed_remove.set_footer(text=footer)
-
-        return embed_remove
     
     def swap_tracks(self, idx1: int, idx2: int) -> bool:
         """

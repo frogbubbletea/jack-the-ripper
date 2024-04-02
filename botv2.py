@@ -635,7 +635,7 @@ async def remove(interaction: discord.Interaction, track_number: int) -> None:
     
     try:
         removed_track: Track = user_server.remove_track(track_number - 1)
-        await interaction.edit_original_response(embed=user_server.compose_remove_track(interaction, removed_track))
+        await interaction.edit_original_response(embed=user_server.play_msg(5, removed_track))
     except ValueError:  # Invalid track no.
         await interaction.edit_original_response(embed=util.compose_move_invalid_index())
     except AttributeError:  # Queue is empty
