@@ -484,6 +484,18 @@ async def skip(interaction: discord.Interaction) -> None:
     # Vote to skip
     await user_server.vote_skip(interaction)
 
+@bot.tree.command(description="Show now playing track!")
+async def np(interaction: discord.Interaction) -> None:
+    """
+    Show the current track.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Get the embed and send it
+    await interaction.edit_original_response(embed=user_server.compose_np())
+
 # Slash commands end
     
 # Text commands start

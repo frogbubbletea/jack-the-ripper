@@ -719,6 +719,11 @@ class Server:
             The number of tracks in the playlist.
         len_failed: :class:`int`
             The number of tracks in the playlist that failed to load.
+
+        Returns
+        --------
+        class:`discord.Embed`
+            The composed embed containing the message.
         """
 
         # Format playlist info
@@ -739,3 +744,79 @@ class Server:
 
         # Return the completed embed
         return embed_playlist_added
+    
+    def compose_np(self) -> discord.Embed:
+        """
+        Compose embed about the current track.
+
+        Defined as a method of :class:`Server` because it uses its attributes.
+
+        Returns
+        --------
+        class:`discord.Embed`
+            The composed embed containing the current track, or a message that no track is playing.
+        """
+
+        # Check if the bot is playing anything
+        if self.current_track is None:
+            return discord.Embed(
+                title="🤷 Nothing is playing!",
+                color=colores["status"]
+            )
+        
+        # Format track info
+        format_desc: str = f"👤 {self.current_track.uploader} | ⏳ `{util.format_duration(self.current_track.duration)}`\n"  # Uploader and duration
+
+        # Get current track elapsed time
+        time_elapsed: int = 0
+        if self.voice_client.is_paused():
+            time_elapsed = int(self.pause_time - self.start_time)
+        else:
+            time_elapsed = int(time.time() - self.start_time)
+
+        # Draw progress bar
+        progress_bar: List[str] = []
+        bar_length: int = 15
+        for i in range(bar_length):
+            progress_bar.append("▬")
+        # Get position of cursor on progress bar
+        bar_deg = int((time_elapsed / self.current_track.duration) * bar_length)
+        if bar_deg > bar_length:
+            bar_deg = bar_length - 1
+        # Put the cursor on the progress bar
+        progress_bar[bar_deg] = "🔘"
+        progress_bar_str: str = "".join(progress_bar)
+
+        # Format progress bar with elapsed time
+        format_elapsed = util.format_duration(time_elapsed)
+        format_duration = util.format_duration(self.current_track.duration)
+        format_desc += f"▶️ `{format_elapsed}` {progress_bar_str} `{format_duration}` 🔊"
+
+        # Format footer
+        # Adder
+        format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n"
+        # Playback settings
+        if (self.shuffle_status == True) or (self.loop_status != LoopStatus.OFF):
+            format_footer += f"{self.playback_settings_to_str()}\n"
+        # Current voice channel
+        format_footer += f"🔊 {self.voice_client.channel.name}"
+
+        # Initialize embed
+        embed_np = discord.Embed(
+            title=self.current_track.title,
+            url=self.current_track.url,
+            description=format_desc,
+            color=colores["status"]
+        )
+
+        # Add header
+        embed_np.set_author(name="▶️ Now playing")
+
+        # Add track thumbnail
+        embed_np.set_thumbnail(url=self.current_track.thumbnail)
+
+        # Add footer
+        embed_np.set_footer(text=format_footer)
+
+        # Return the composed embed
+        return embed_np
