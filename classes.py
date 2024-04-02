@@ -4,6 +4,7 @@ import asyncio
 import random
 import time
 import functools
+import math
 
 import discord
 from discord.ext import commands, tasks
@@ -140,7 +141,7 @@ class Server:
         # Session settings
         self.loop_status: LoopStatus = LoopStatus.OFF  # Loop mode
         self.shuffle_status: bool = False  # Shuffle play
-        self.voteskip_list: List[int] = []  # List of user IDs who voted to skip current track
+        self.voteskip_list: List[discord.Member] = []  # List of user IDs who voted to skip current track
     
     def reset(self) -> None:
         """
@@ -441,7 +442,7 @@ class Server:
         # Return the completed embed
         return embed_queue_add
 
-    def play_msg(self, mode: int=0) -> discord.Embed:
+    def play_msg(self, mode: int=0, track: Track=None) -> discord.Embed:
         """
         Compose playback confirmation message.
 
@@ -452,6 +453,10 @@ class Server:
         mode: :class:`int`
             The type of playback to confirm.
                 0: Start
+                1: Vote skip
+                2: Skip
+        track: :class:`Track`
+            The track to compose the message with. Defaults to the current track.
         
         Returns
         --------
@@ -464,21 +469,27 @@ class Server:
             The mode is invalid.
         """
 
+        # Get current track if no track is given
+        if track is None:
+            track = self.current_track
+
         # Select playback type
         try:
             title = [
-                "▶️ Started playing!"
+                "▶️ Started playing!",
+                "🗳️ Voted to skip!",
+                "⏩ Skipped!"
             ][mode]
         except IndexError:
             raise ValueError("Invalid mode.")
         
         # Format track info
         # Title and URL
-        format_desc = f"[{self.current_track.title}]({self.current_track.url})" 
+        format_desc = f"[{track.title}]({track.url})" 
         # Uploader and duration
-        format_desc += f"\n👤 {self.current_track.uploader} | ⏳ `{util.format_duration(self.current_track.duration)}`"  
+        format_desc += f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  
         # Adder and current voice channel
-        format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n🔊 {self.voice_client.channel.name}"
+        format_footer = f"🙋 Added by {track.adder.display_name}\n🔊 {self.voice_client.channel.name}"
 
         # Initialize embed
         embed_play = discord.Embed(
@@ -487,9 +498,18 @@ class Server:
             color=colores["play"]
         )
 
+        # [1] Add vote counts
+        num_skip = math.ceil((len(self.voice_client.channel.members) - 1) / 2)  # Calculate number of votes required to skip
+        if mode == 1:
+            embed_play.add_field(
+                name="🗳️ Votes",
+                value=f"{len(self.voteskip_list)} / {num_skip} required",
+                inline=False
+            )
+
         # Configure footer
         # Adder
-        format_footer = f"🙋 Added by {self.current_track.adder.display_name}\n"
+        format_footer = f"🙋 Added by {track.adder.display_name}\n"
         # Playback settings
         if (self.shuffle_status == True) or (self.loop_status != LoopStatus.OFF):
             format_footer += f"{self.playback_settings_to_str()}\n"
@@ -499,7 +519,7 @@ class Server:
         embed_play.set_footer(text=format_footer)
 
         # Add track thumbnail
-        embed_play.set_thumbnail(url=self.current_track.thumbnail)
+        embed_play.set_thumbnail(url=track.thumbnail)
 
         # Add voice channel name
         embed_play.set_footer(text=format_footer)
@@ -558,6 +578,49 @@ class Server:
         
         return queue_page
     
+    async def vote_skip(self, interaction: discord.Interaction) -> bool:
+        """
+        Record a user's vote to skip the current track. If more than half of the users in the voice channel has voted, skip the track.
+
+        Parameters
+        -----------
+        user: :class:`discord.Member`
+            The interaction containing the user who voted to skip.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if there are enough votes to skip the track, False otherwise.
+        
+        Raises
+        -------
+        ValueError
+            The user has already voted to skip.
+        """
+
+        # Check if user has already voted
+        if interaction.user in self.voteskip_list:
+            raise ValueError("User has already voted to skip.")
+        
+        # Add the vote
+        self.voteskip_list.append(interaction.user)
+
+        # Remove users who left the voice channel after voting
+        self.voteskip_list = [u for u in self.voteskip_list if u in self.voice_client.channel.members]
+
+        # Send vote confirm message
+        await interaction.edit_original_response(embed=self.play_msg(1))
+
+        # If there are enough votes, skip the track
+        if len(self.voteskip_list) >= math.ceil((len(self.voice_client.channel.members) - 1) / 2):
+            # Send skip message
+            await interaction.channel.send(embed=self.play_msg(2))
+            # Skip the track
+            self.voice_client.stop()
+            return True
+        else:
+            return False
+
     def compose_queue_page(self, page: int) -> discord.Embed:
         """
         Compose an embed from one page of the queue. Current track is added before the first page.

@@ -171,6 +171,22 @@ def compose_not_same_vc():
     )
     return embed_not_same_vc
 
+def compose_bot_not_in_vc() -> discord.Embed:
+    """
+    Compose error message that the bot is not in a voice channel.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_bot_not_in_vc = discord.Embed(
+        title="🤷 Jack is not in a voice channel!",
+        color=colores["error"]
+    )
+    return embed_bot_not_in_vc
+
 def compose_leave(leave_status: int, user: discord.Member) -> discord.Embed:
     """
     Compose a confirmation/error message for the bot leaving a voice channel.

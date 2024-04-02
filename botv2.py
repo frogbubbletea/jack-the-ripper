@@ -463,6 +463,27 @@ async def queue(interaction: discord.Interaction, page: typing.Optional[int]) ->
         view=QueuePage(page=page, server=user_server)
     )
 
+@bot.tree.command(description="Skip to next track in queue!")
+async def skip(interaction: discord.Interaction) -> None:
+    """
+    Stop the current track and play the next.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in the same voice channel
+    try:
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_bot_not_in_vc())
+        return
+    
+    # Vote to skip
+    await user_server.vote_skip(interaction)
+
 # Slash commands end
     
 # Text commands start
