@@ -273,7 +273,7 @@ async def play(interaction: discord.Interaction, url: str) -> None:
     user_server.add_track(track)
 
     # Start the queue if bot is not already playing
-    if not (user_server.voice_client.is_playing()) or (user_server.voice_client.is_paused()):
+    if not (user_server.voice_client.is_playing() or user_server.voice_client.is_paused()):
         await user_server.play_next(interaction, loop=bot.loop)
     
     # Send confirmation message
@@ -549,6 +549,31 @@ async def shuffle(interaction: discord.Interaction) -> None:
     # Change the setting and send confirmation message
     user_server.set_shuffle_status(not user_server.shuffle_status)
     await interaction.edit_original_response(embed=user_server.compose_set_shuffle(interaction))
+
+@bot.tree.command(description="Pause/resume playback!")
+async def pause(interaction: discord.Interaction) -> None:
+    """
+    Pause/resume playback.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in the same voice channel
+    try:
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_bot_not_in_vc())
+        return
+    
+    # Pause/resume playback
+    pause_resume_result: bool = user_server.pause_resume()
+    if pause_resume_result == True:
+        await interaction.edit_original_response(embed=user_server.play_msg(3))
+    else:
+        await interaction.edit_original_response(embed=user_server.play_msg(4))
 
 # Slash commands end
     

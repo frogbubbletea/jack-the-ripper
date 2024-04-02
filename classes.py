@@ -599,6 +599,8 @@ class Server:
                 0: Start
                 1: Vote skip
                 2: Skip
+                3: Pause
+                4: Resume
         track: :class:`Track`
             The track to compose the message with. Defaults to the current track.
         
@@ -622,7 +624,9 @@ class Server:
             title = [
                 "▶️ Started playing!",
                 "🗳️ Voted to skip!",
-                "⏩ Skipped!"
+                "⏩ Skipped!",
+                "⏸️ Paused!",
+                "▶️ Resumed!"
             ][mode]
         except IndexError:
             raise ValueError("Invalid mode.")
@@ -915,7 +919,9 @@ class Server:
 
         # Get current track elapsed time
         time_elapsed: int = 0
+        progress_bar_icon: str = "▶️"
         if self.voice_client.is_paused():
+            progress_bar_icon = "⏸️"
             time_elapsed = int(self.pause_time - self.start_time)
         else:
             time_elapsed = int(time.time() - self.start_time)
@@ -936,7 +942,7 @@ class Server:
         # Format progress bar with elapsed time
         format_elapsed = util.format_duration(time_elapsed)
         format_duration = util.format_duration(self.current_track.duration)
-        format_desc += f"▶️ `{format_elapsed}` {progress_bar_str} `{format_duration}` 🔊"
+        format_desc += f"{progress_bar_icon} `{format_elapsed}` {progress_bar_str} `{format_duration}` 🔊"
 
         # Format footer
         # Adder
@@ -966,3 +972,35 @@ class Server:
 
         # Return the composed embed
         return embed_np
+    
+    def pause_resume(self) -> bool:
+        """
+        Pause/resume the bot's playback.
+
+        Returns
+        --------
+        :class:`bool`
+            True if the playback is paused, False if the playback is resumed.
+        
+        Raises
+        -------
+        AttributeError
+            Bot is not in a voice channel, or is not playing anything.
+        """
+
+        # If bot is not in a voice channel, or is not playing anything
+        if (self.voice_client is None) or ((self.voice_client.is_playing() == False) and (self.voice_client.is_paused() == False)):
+            raise AttributeError("Bot is not playing or paused.")
+        
+        # Pause/resume the bot.
+        if self.voice_client.is_playing():  # Pause
+            self.voice_client.pause()
+            # Record pause time
+            self.pause_time = time.time()
+            return True
+        else:  # Resume
+            self.voice_client.resume()
+            # Calculate pause duration and readjust start time
+            pause_duration: int = time.time() - self.pause_time
+            self.start_time = self.start_time + pause_duration
+            return False
