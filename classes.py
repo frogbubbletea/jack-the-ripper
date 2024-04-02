@@ -1027,6 +1027,7 @@ class Server:
             True if the move is successful, False otherwise.
         
         Raises
+        -------
         ValueError
             If the given track and position indexes are out of range.
         AttributeError
@@ -1179,3 +1180,106 @@ class Server:
         embed_remove.set_footer(text=footer)
 
         return embed_remove
+    
+    def swap_tracks(self, idx1: int, idx2: int) -> bool:
+        """
+        Swap two tracks in the queue.
+
+        Parameters
+        -----------
+        idx1: :class:`int`
+            The 0-based index of the first track to swap.
+        idx2: :class:`int`
+            The 0-based index of the second track to swap.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if the move is successful, False otherwise.
+        
+        Raises
+        -------
+        ValueError
+            If the given indexes are out of range.
+        AttributeError
+            The queue is empty and no track is playing.
+        """
+
+        # Check if queue is empty
+        if (len(self.queue) < 1) and (self.current_track is None):
+            raise AttributeError("Queue is empty and no track is playing.")
+        
+        # Check indexes are in range
+        if (idx1 < 0 or idx1 >= len(self.queue)) or (idx2 < 0 or idx2 >= len(self.queue)):
+            raise ValueError("Invalid track index.")
+
+        try:
+            # Swap the tracks
+            self.queue[idx1], self.queue[idx2] = self.queue[idx2], self.queue[idx1]
+            return True
+        except:
+            raise ValueError("Invalid track index.")
+    
+    def compose_swap_tracks(self, interaction: discord.Interaction, idx1: int, idx2: int) -> discord.Embed:
+        """
+        Compose swap track confirmation message.
+
+        This function is defined in :class:`Server` because it uses its queue.
+
+        Called after swapping the tracks.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction containing the user who performed the move.
+        idx1: :class:`int`
+            The 0-based index of the first track to swap.
+        idx2: :class:`int`
+            The 0-based index of the second track to swap.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+
+        # Get the swapped tracks
+        track1: Track = self.queue[idx2]
+        track2: Track = self.queue[idx1]
+
+        # Format tracks info
+        desc1: str = f"[{track1.title}]({track1.url})\n"  # Title and URL
+        desc1 += f"👤 {track1.uploader} | ⏳ `{util.format_duration(track1.duration)}`\n"  # Uploader and duration
+
+        desc2: str = f"[{track2.title}]({track2.url})\n"
+        desc2 += f"👤 {track2.uploader} | ⏳ `{util.format_duration(track2.duration)}`\n"
+
+        # Name of the user who performed the move
+        footer = f"🙋 Moved by {interaction.user.display_name}\n"
+        # Playback settings
+        if (self.shuffle_status == True) or (self.loop_status != LoopStatus.OFF):
+            footer += f"{self.playback_settings_to_str()}\n"
+        footer += f"🔊 {self.voice_client.channel.name}"
+
+        # Initialize embed
+        embed_swap: discord.Embed = discord.Embed(
+            title="🔃 Swapped tracks!",
+            color=colores["play"]
+        )
+
+        # Add the track infos
+        embed_swap.add_field(
+            name=f"💿 Swapped track {idx1 + 1}",
+            value=desc1,
+            inline=False
+        )
+        embed_swap.add_field(
+            name=f"💿 With track {idx2 + 1}",
+            value=desc2,
+            inline=False
+        )
+
+        # Add footer
+        embed_swap.set_footer(text=footer)
+
+        return embed_swap

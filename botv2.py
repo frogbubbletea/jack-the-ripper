@@ -641,6 +641,39 @@ async def remove(interaction: discord.Interaction, track_number: int) -> None:
     except AttributeError:  # Queue is empty
         await interaction.edit_original_response(embed=util.compose_queue_empty())
 
+@bot.tree.command(description="Swap two tracks in the queue!")
+async def swap(interaction: discord.Interaction, track_one: int, track_two: int) -> None:
+    """
+    Swap two tracks in the queue.
+
+    Parameters
+    -----------
+    track_one: :class:`int`
+        The 1-based number of the first track to swap.
+    track_two: :class:`int`
+        The 1-based number of the second track to swap.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in the same voice channel
+    try:
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_bot_not_in_vc())
+        return
+    
+    try:
+        user_server.swap_tracks(track_one - 1, track_two - 1)
+        await interaction.edit_original_response(embed=user_server.compose_swap_tracks(interaction, track_one - 1, track_two - 1))
+    except ValueError:  # Invalid track no.
+        await interaction.edit_original_response(embed=util.compose_move_invalid_index())
+    except AttributeError:  # Queue is empty
+        await interaction.edit_original_response(embed=util.compose_queue_empty())
+
 # Slash commands end
     
 # Text commands start
