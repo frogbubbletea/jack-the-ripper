@@ -528,6 +528,28 @@ async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int])
     user_server.set_loop_status(LoopStatus(mode.value))
     await interaction.edit_original_response(embed=user_server.compose_set_loop(interaction))
 
+@bot.tree.command(description="Toggle shuffle play!")
+async def shuffle(interaction: discord.Interaction) -> None:
+    """
+    Toggle the shuffle setting of the user's server.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in the same voice channel
+    try:
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_bot_not_in_vc())
+        return
+    
+    # Change the setting and send confirmation message
+    user_server.set_shuffle_status(not user_server.shuffle_status)
+    await interaction.edit_original_response(embed=user_server.compose_set_shuffle(interaction))
+
 # Slash commands end
     
 # Text commands start

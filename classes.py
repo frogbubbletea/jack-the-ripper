@@ -198,7 +198,7 @@ class Server:
         Parameters
         -----------
         interaction: :class:`discord.Interaction`
-            The interaction containing the user responsible for the setting and the text channel where the setting took place.
+            The interaction containing the user who performed the setting and the text channel where the setting took place.
         
         Returns
         --------
@@ -234,6 +234,73 @@ class Server:
         # Return completed embed
         return embed_loop
     
+    def set_shuffle_status(self, new_value: bool) -> bool:
+        """
+        Set the shuffle playback setting for the server.
+
+        Parameters
+        -----------
+        new_value: :class:`bool`
+            The desired shuffle setting to set to.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if the setting is successful, False otherwise.
+        
+        Raises
+        -------
+        Exception
+            Any exception raised during the setting.
+        """
+
+        try:
+            self.shuffle_status = new_value
+            return True
+        except Exception as e:
+            raise
+
+    def compose_set_shuffle(self, interaction: discord.Interaction) -> discord.Embed:
+        """
+        Compose a message confirming the shuffle playback setting of the server has been set.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction containing the user who performed the setting and the text channel where the setting took place.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+        # Set embed title based on shuffle setting
+        title: str = {
+            False: "▶️ Shuffle play disabled!",
+            True: "🔀 Shuffle play enabled!"
+        }[self.shuffle_status]
+
+        # Initialize embed
+        embed_shuffle: discord.Embed = discord.Embed(
+            title=title,
+            color=colores["play"]
+        )
+
+        # Display current playback settings
+        embed_shuffle.add_field(
+            name="⚙️ Current settings",
+            value=self.playback_settings_to_str(),
+            inline=False
+        )
+
+        # Set footer
+        format_footer: str = f"🙋 Set by {interaction.user.display_name}\n"
+        format_footer += f"🔊 {self.voice_client.channel.name}"
+        embed_shuffle.set_footer(text=format_footer)
+
+        # Return completed embed
+        return embed_shuffle
+
     def playback_settings_to_str(self) -> str:
         """
         Convert playback settings to a string for visualization.
@@ -251,13 +318,13 @@ class Server:
         settings_str = ""
 
         if self.loop_status == LoopStatus.TRACK:
-            settings_str += "🔂 Loop track on"
+            settings_str += "🔂 Loop track on\n"
         elif self.loop_status == LoopStatus.QUEUE:
-            settings_str += "🔁 Loop queue on"
+            settings_str += "🔁 Loop queue on\n"
         if self.shuffle_status == True:
-            settings_str += "\n🔀 Shuffle on"
+            settings_str += "🔀 Shuffle play on"
         
-        return settings_str
+        return settings_str.rstrip("\n")
 
     def check_same_vc(self, user: discord.Member) -> bool:
         """
