@@ -1023,13 +1023,23 @@ class Server:
         
         Returns
         --------
-            :class:`bool`
-                True if the move is successful, False otherwise
+        :class:`bool`
+            True if the move is successful, False otherwise.
         
         Raises
-            ValueError
-                If the given track and position indexes are out of range.
+        ValueError
+            If the given track and position indexes are out of range.
+        AttributeError
+            The queue is empty and no track is playing.
         """
+
+        # Check if queue is empty
+        if (len(self.queue) < 1) and (self.current_track is None):
+            raise AttributeError("Queue is empty and no track is playing.")
+        
+        # Check track/pos indexes are in range
+        if (track_idx < 0 or track_idx >= len(self.queue)) or (pos_idx < 0 or pos_idx >= len(self.queue)):
+            raise ValueError("Invalid track/position index.")
 
         try:
             track: Track = self.queue[track_idx]  # Get the track
@@ -1090,3 +1100,82 @@ class Server:
         embed_move.set_footer(text=footer)
 
         return embed_move
+    
+    def remove_track(self, track_idx: int) -> Track:
+        """
+        Remove the track at the specified position from the queue.
+
+        Parameters
+        -----------
+        track_idx: :class:`int`
+            The 0-based index of the track to remove in the queue.
+        
+        Returns
+        --------
+        :class:`Track`
+            The track that is just removed.
+        
+        Raises
+        -------
+        ValueError
+            The given track indexes are out of range.
+        AttributeError
+            The queue is empty and no track is playing.
+        """
+
+        # Check if queue is empty
+        if (len(self.queue) < 1) and (self.current_track is None):
+            raise AttributeError("Queue is empty and no track is playing.")
+
+        try:
+            track = self.queue[track_idx]
+            self.queue.pop(track_idx)
+            return track
+        except IndexError:
+            raise ValueError("Invalid track index.")
+    
+    def compose_remove_track(self, interaction: discord.Interaction, track: Track) -> discord.Embed:
+        """
+        Compose remove track confirmation message.
+
+        This function is defined in :class:`Server` because it uses its queue.
+
+        Called after removing the track.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction containing the user who performed the move.
+        track: :class:`Track`
+            The track that is removed. returned from `remove_track()`.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+
+        # Format track info
+        desc: str = f"👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`\n"  # Uploader and duration
+        
+        footer = f"🙋 Removed by {interaction.user.display_name}\n"
+        footer += f"🔊 {self.voice_client.channel.name}"
+
+        # Initialize embed
+        embed_remove: discord.Embed = discord.Embed(
+            title=track.title,
+            url=track.url,
+            description=desc,
+            color=colores["play"]
+        )
+
+        # Set title
+        embed_remove.set_author(name="🚮 Removed from queue!")
+
+        # Set thumbnail
+        embed_remove.set_thumbnail(url=track.thumbnail)
+
+        # Add footer
+        embed_remove.set_footer(text=footer)
+
+        return embed_remove
