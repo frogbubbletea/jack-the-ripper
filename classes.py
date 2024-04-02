@@ -420,8 +420,7 @@ class Server:
             The embed containing the message to send.
         """
         # Format track info
-        format_value = f"[{track.title}]({track.url})"  # Title and URL
-        format_value += f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  # Uploader and duration
+        format_value = f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  # Uploader and duration
         format_footer = f"🙋 Added by {track.adder.display_name}"  # Adder
         try:  # Current voice channel
             format_footer += f"\n🔊 {self.voice_client.channel.name}"
@@ -430,10 +429,12 @@ class Server:
 
         # Initialize embed
         embed_queue_add = discord.Embed(
-            title="👍 Added to queue!",
+            title=track.title,
+            url=track.url,
             description=format_value,
             color=colores["play"]
         )
+        embed_queue_add.set_author(name="👍 Added to queue!")
         embed_queue_add.set_footer(text=format_footer)
 
         # Add track thumbnail
@@ -484,19 +485,21 @@ class Server:
             raise ValueError("Invalid mode.")
         
         # Format track info
-        # Title and URL
-        format_desc = f"[{track.title}]({track.url})" 
         # Uploader and duration
-        format_desc += f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  
+        format_desc = f"\n👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`"  
         # Adder and current voice channel
         format_footer = f"🙋 Added by {track.adder.display_name}\n🔊 {self.voice_client.channel.name}"
 
         # Initialize embed
         embed_play = discord.Embed(
-            title=title,
+            title=track.title,
+            url=track.url,
             description=format_desc,
             color=colores["play"]
         )
+
+        # Add title
+        embed_play.set_author(name=title)
 
         # [1] Add vote counts
         num_skip = math.ceil((len(self.voice_client.channel.members) - 1) / 2)  # Calculate number of votes required to skip
