@@ -161,6 +161,79 @@ class Server:
         self.shuffle_status = False
         self.voteskip_list = []
     
+    def set_loop_status(self, new_value: LoopStatus) -> bool:
+        """
+        Set the loop mode playback setting for the server.
+
+        Parameters
+        -----------
+        new_value: :class:`LoopStatus`
+            The desired loop mode to set to.
+        
+        Returns
+        --------
+        :class:`bool`
+            True if the setting is successful, False otherwise.
+        
+        Raises
+        -------
+        Exception
+            Any exception raised during the setting.
+        """
+        try:
+            self.loop_status = new_value
+
+            # If loop queue is enabled after the current track started playing, add it back to the queue manually
+            if (self.loop_status == LoopStatus.QUEUE) and (self.current_track not in self.queue):
+                self.queue.append(self.current_track)
+
+            return True
+        except Exception as e:
+            raise
+    
+    def compose_set_loop(self, interaction: discord.Interaction) -> discord.Embed:
+        """
+        Compose a message confirming the loop mode playback setting of the server has been set.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction containing the user responsible for the setting and the text channel where the setting took place.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+
+        # Set embed title based on loop mode setting
+        title: str = [
+            "▶️ Loop disabled!",
+            "🔁 Loop queue enabled!",
+            "🔂 Loop track enabled!"
+        ][self.loop_status.value]
+
+        # Initialize embed
+        embed_loop: discord.Embed = discord.Embed(
+            title=title,
+            color=colores["play"]
+        )
+
+        # Display current playback settings
+        embed_loop.add_field(
+            name="⚙️ Current settings",
+            value=self.playback_settings_to_str(),
+            inline=False
+        )
+
+        # Set footer
+        format_footer: str = f"🙋 Set by {interaction.user.display_name}\n"
+        format_footer += f"🔊 {self.voice_client.channel.name}"
+        embed_loop.set_footer(text=format_footer)
+
+        # Return completed embed
+        return embed_loop
+    
     def playback_settings_to_str(self) -> str:
         """
         Convert playback settings to a string for visualization.
@@ -178,11 +251,11 @@ class Server:
         settings_str = ""
 
         if self.loop_status == LoopStatus.TRACK:
-            embed_play_settings += "🔂 Loop track on"
+            settings_str += "🔂 Loop track on"
         elif self.loop_status == LoopStatus.QUEUE:
-            embed_play_settings += "🔁 Loop queue on"
+            settings_str += "🔁 Loop queue on"
         if self.shuffle_status == True:
-            embed_play_settings += "\n🔀 Shuffle on"
+            settings_str += "\n🔀 Shuffle on"
         
         return settings_str
 
@@ -304,13 +377,15 @@ class Server:
         if self.shuffle_status == True:
             chosen_idx = random.randrange(len(self.queue))
         
+        # If loop track is on, keep playing current track
+        if self.loop_status == LoopStatus.TRACK:
+            return
         # Assign the chosen track to current_track
         self.current_track = self.queue[chosen_idx]
-        # Remove chosen track from queue if not looping track
-        if self.loop_status != LoopStatus.TRACK:
-            self.queue.pop(chosen_idx)
-        # If looping queue and not shuffling, move chosen track (now current_track) to back of queue
-        if (self.loop_status == LoopStatus.QUEUE) and (self.shuffle_status == False):
+        # Remove chosen track from queue
+        self.queue.pop(chosen_idx)
+        # If looping queue, move chosen track (now current_track) to back of queue
+        if (self.loop_status == LoopStatus.QUEUE):
             self.queue.append(self.current_track)
 
     async def idle_timer_loop(self, text_channel: discord.TextChannel) -> None:
@@ -363,8 +438,9 @@ class Server:
         """
         # Reset voteskip status
         self.voteskip_list = []
-        # Clear current track
-        self.current_track = None
+        # Clear current track if not looping track
+        if self.loop_status != LoopStatus.TRACK:
+            self.current_track = None
 
         # Cancel the idle timer if any
         if (self.idle_timer is not None) and (len(self.queue) > 0):

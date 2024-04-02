@@ -496,6 +496,38 @@ async def np(interaction: discord.Interaction) -> None:
     # Get the embed and send it
     await interaction.edit_original_response(embed=user_server.compose_np())
 
+@bot.tree.command(description="Change the current loop mode!")
+@app_commands.choices(mode=[
+    app_commands.Choice(name='off', value=LoopStatus.OFF.value),
+    app_commands.Choice(name='queue', value=LoopStatus.QUEUE.value),
+    app_commands.Choice(name='track', value=LoopStatus.TRACK.value)
+])
+async def loop(interaction: discord.Interaction, mode: app_commands.Choice[int]) -> None:
+    """
+    Change the loop mode setting of the user's server to one of "off", "queue" and "track".
+
+    Parameters
+    -----------
+    mode: :class:`discord.app_commands.Choice[LoopStatus]`
+        The loop mode setting to change to.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Check if user is in the same voice channel
+    try:
+        if user_server.check_same_vc(interaction.user) == False:
+            await interaction.edit_original_response(embed=util.compose_not_same_vc())
+            return
+    except AttributeError:  # Bot is not in a voice channel
+        await interaction.edit_original_response(embed=util.compose_bot_not_in_vc())
+        return
+    
+    # Change the setting and send confirmation message
+    user_server.set_loop_status(LoopStatus(mode.value))
+    await interaction.edit_original_response(embed=user_server.compose_set_loop(interaction))
+
 # Slash commands end
     
 # Text commands start
