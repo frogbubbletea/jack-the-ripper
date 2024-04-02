@@ -19,6 +19,8 @@ from config import colores, ydl_opts
 from classes import Track, LoopStatus, Server
 import util
 
+bot_version: str = "2.0"
+
 # Uncomment when running on replit (1/3)
 # from keep_alive import keep_alive
 
@@ -673,6 +675,59 @@ async def swap(interaction: discord.Interaction, track_one: int, track_two: int)
         await interaction.edit_original_response(embed=util.compose_move_invalid_index())
     except AttributeError:  # Queue is empty
         await interaction.edit_original_response(embed=util.compose_queue_empty())
+
+@bot.tree.command(description="Show info about Jack!")
+async def about(interaction: discord.Interaction) -> None:
+    """
+    Show information about the bot.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    # Format the info
+    guild_count = len(bot.guilds)
+    vc_count = len([s for i, s in servers.items() if s.voice_client is not None])  # Number of voice channels the bot is in
+    playback_settings = user_server.playback_settings_to_str()
+    try:
+        vc_name: str = user_server.voice_client.channel.name
+    except AttributeError:
+        vc_name: str = ""
+    
+    # Initialize the embed
+    embed_about: discord.Embed = discord.Embed(
+        title="🗡️ About Jack!",
+        color=colores["status"]
+    )
+
+    embed_about.add_field(
+        name="⬆️ Version",
+        value=f"```\n{bot_version}\n```",
+        inline=False
+    )
+    embed_about.add_field(
+        name="🏢 Servers",
+        value=f"```\n{guild_count}\n```",
+        inline=False
+    )
+    embed_about.add_field(
+        name="🔊 Voice connections",
+        value=f"```\n{vc_count}\n```",
+        inline=False
+    )
+    if vc_name != "":
+        embed_about.add_field(
+            name="🔊 Current voice channel in this server",
+            value=f"```\n{vc_name}\n```",
+            inline=False
+        )
+        embed_about.add_field(
+            name="⚙️ Playback settings for this server",
+            value=f"```\n{playback_settings}\n```",
+            inline=False
+        )
+
+    await interaction.edit_original_response(embed=embed_about)
 
 # Slash commands end
     
