@@ -575,6 +575,30 @@ async def pause(interaction: discord.Interaction) -> None:
     else:
         await interaction.edit_original_response(embed=user_server.play_msg(4))
 
+@bot.tree.command(description="Move a track to another position!")
+async def move(interaction: discord.Interaction, track_number: int, position: int) -> None:
+    """
+    Move a track in queue to another position.
+
+    Removes the track from the queue, then inserts it at the specified position.
+
+    Parameters
+    -----------
+    track_number: :class:`int`
+        The 1-based number of the track to move.
+    position: :class:`int`
+        The 1-based position in the queue to move the track to.
+    """
+
+    await interaction.response.defer(thinking=True)
+    user_server: Server = servers[interaction.guild_id]
+
+    try:
+        user_server.move_track(track_number - 1, position - 1)
+        await interaction.edit_original_response(embed=user_server.compose_move_track(interaction, track_number - 1, position - 1))
+    except ValueError:
+        await interaction.edit_original_response(embed=util.compose_move_invalid_index())
+
 # Slash commands end
     
 # Text commands start

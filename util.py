@@ -447,3 +447,19 @@ def compose_playlist_adding() -> discord.Embed:
         color=colores["status"]
     )
     return embed_playlist_adding
+
+def compose_move_invalid_index() -> discord.Embed:
+    """
+    Compose a message that the given track or position index, or both, are out of range.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_move_invalid_index: discord.Embed = discord.Embed(
+        title="⚠️ Invalid track/position number!",
+        color=colores["error"]
+    )
+    return embed_move_invalid_index

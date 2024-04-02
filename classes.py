@@ -1009,3 +1009,84 @@ class Server:
             pause_duration: int = time.time() - self.pause_time
             self.start_time = self.start_time + pause_duration
             return False
+        
+    def move_track(self, track_idx: int, pos_idx: int) -> bool:
+        """
+        Move a track in queue by inserting it to the specified position.
+
+        Parameters
+        -----------
+        track_idx: :class:`int`
+            The 0-based index of the track to move in the queue.
+        pos_idx: :class:`int`
+            The 0-based index of the position to move the track to.
+        
+        Returns
+        --------
+            :class:`bool`
+                True if the move is successful, False otherwise
+        
+        Raises
+            ValueError
+                If the given track and position indexes are out of range.
+        """
+
+        try:
+            track: Track = self.queue[track_idx]  # Get the track
+            self.queue.remove(track)  # Remove it from queue
+            self.queue.insert(pos_idx, track)  # Reinsert at specified position
+            return True
+        except:
+            raise ValueError("Invalid track/position index.")
+        
+    def compose_move_track(self, interaction: discord.Interaction, track_idx: int, pos_idx: int) -> discord.Embed:
+        """
+        Compose move track confirmation message.
+
+        This function is defined in :class:`Server` because it uses its queue.
+
+        Called after moving the track.
+
+        Parameters
+        -----------
+        interaction: :class:`discord.Interaction`
+            The interaction containing the user who performed the move.
+        track_idx: :class:`int`
+            The 0-based index of the track to move in the queue.
+        pos_idx: :class:`int`
+            The 0-based index of the position to move the track to.
+        
+        Returns
+        --------
+        :class:`discord.Embed`
+            The embed containing the message to send.
+        """
+
+        # Get the moved track
+        track: Track = self.queue[pos_idx]
+
+        # Format track info
+        desc: str = f"👤 {track.uploader} | ⏳ `{util.format_duration(track.duration)}`\n"  # Uploader and duration
+        desc += f"From 💿 {track_idx + 1} to 💿 {pos_idx + 1}"  # Track numbers
+
+        footer = f"🙋 Moved by {interaction.user.display_name}\n"  # Name of the user who performed the move
+        footer += f"🔊 {self.voice_client.channel.name}"
+
+        # Initialize embed
+        embed_move: discord.Embed = discord.Embed(
+            title=track.title,
+            url=track.url,
+            description=desc,
+            color=colores["play"]
+        )
+
+        # Set title
+        embed_move.set_author(name="🫳 Moved track!")
+
+        # Set thumbnail
+        embed_move.set_thumbnail(url=track.thumbnail)
+
+        # Add footer
+        embed_move.set_footer(text=footer)
+
+        return embed_move
