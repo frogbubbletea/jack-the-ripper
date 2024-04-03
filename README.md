@@ -2,10 +2,10 @@
 
 A simple music bot that streams from YouTube and supports slash commands! 🐈‍⬛
 
-Try the bot on our [Discord server](https://discord.gg/RNmMMF6xHY)!
+Try it on our [Discord server](https://discord.gg/RNmMMF6xHY)!
 
-![Playing something with Jack](https://cdn.discordapp.com/attachments/958651015064854551/1059756759310417940/image.png)
-![Searching for a track with Jack](https://cdn.discordapp.com/attachments/1029326036149751828/1059846731434557471/image.png)
+![Playing something with Jack](sample_screenshots/add_track.png)<br>
+![Adding a playlist](sample_screenshots/playlist.png)
 
 ## 💠 Table of contents
 - [🗡️ Features](#🗡️-features)
@@ -16,7 +16,7 @@ Try the bot on our [Discord server](https://discord.gg/RNmMMF6xHY)!
 ## 🗡️ Features
 📺 Supports playing from YouTube!
 
-- 🔗 Using [video URL](https://youtu.be/FXsGCieXm1E)
+- 🔗 Using [video/playlist URL](https://youtu.be/FXsGCieXm1E)
 
 - 🔍 Searching by keyword
 
@@ -37,7 +37,7 @@ You need the following packages:
 - [PyNaCl](https://pypi.org/project/PyNaCl/)
 - [python-dotenv](https://pypi.org/project/python-dotenv/) (NOT `dotenv`)
 
-You can install them using `pip`.
+Instructions to install them can be found below.
 
 You also need to have [ffmpeg](https://ffmpeg.org/) installed.
 
@@ -47,6 +47,17 @@ You also need to have [ffmpeg](https://ffmpeg.org/) installed.
 
 ```
 git clone https://github.com/succsuccsucc/jack-the-ripper.git
+```
+
+2. Set up a virtual environment for the bot:
+```
+cd ~/jack-the-ripper
+python -m venv ./.venv
+```
+
+3. Install the dependencies
+```
+pip install -r requirements.txt
 ```
 
 ### 🪪 Get an account for the bot
@@ -60,14 +71,19 @@ git clone https://github.com/succsuccsucc/jack-the-ripper.git
 ```
 # .env
 DISCORD_TOKEN=<your-bot-token>
+ADMIN_ID=<your-discord-id>
+TEST_SERVER_ID=<your-test-server-id>
 ```
+
+Where `ADMIN_ID` is your Discord ID, and `TEST_SERVER_ID` is the ID of a server that only has you in it.
+  > Find your user and server IDs [here](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID).
 
 ### 🏃‍♀️ Run the bot
 
 1. Run `bot.py`
 
 ```
-python3 bot.py
+python3 botv2.py
 ```
 
 ### 🏁 And you're all set!
@@ -75,9 +91,6 @@ python3 bot.py
 ## 🤨 Issues
 
 ### 📑 Known issues
-
-- Playlists are unsupported due to a YouTube limitation! The bot will refuse links to playlists.
-  - Shorts support has been added in v1.2.1.
 
 ### 📮 Report a problem
 
