@@ -359,7 +359,7 @@ async def playlist(interaction: discord.Interaction, url: str) -> None:
             num_failed_tracks += 1
     
     # Start the queue if bot is not already playing
-    if not (user_server.voice_client.is_playing()) or (user_server.voice_client.is_paused()):
+    if not (user_server.voice_client.is_playing() or user_server.voice_client.is_paused()):
         await user_server.play_next(interaction, loop=bot.loop)
     
     # Send confirmation message
