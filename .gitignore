@@ -1,8 +1,18 @@
 # ignore pycache
 __pycache__/
-# ignore environment file
+
+# Environments
 .env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.vscode/
+
 # ignore .replit file
 .replit
+# ignore venv
 # ignore libopus file
 libopus.so.0.8.0
