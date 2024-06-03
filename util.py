@@ -463,3 +463,19 @@ def compose_move_invalid_index() -> discord.Embed:
         color=colores["error"]
     )
     return embed_move_invalid_index
+
+def compose_vote_already_cast() -> discord.Embed:
+    """
+    Compose a message that the user has already voted to skip the current track.
+
+    Returns
+    --------
+    :class:`discord.Embed`
+        The embed containing the message to send.
+    """
+
+    embed_move_invalid_index: discord.Embed = discord.Embed(
+        title="⚠️ You've already voted to skip!",
+        color=colores["error"]
+    )
+    return embed_move_invalid_index

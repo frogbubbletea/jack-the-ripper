@@ -484,7 +484,11 @@ async def skip(interaction: discord.Interaction) -> None:
         return
     
     # Vote to skip
-    await user_server.vote_skip(interaction)
+    try:
+        await user_server.vote_skip(interaction)
+    except ValueError:
+        await interaction.edit_original_response(embed=util.compose_vote_already_cast())
+        return
 
 @bot.tree.command(description="Show now playing track!")
 async def np(interaction: discord.Interaction) -> None:
