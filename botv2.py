@@ -12,6 +12,7 @@ import asyncio
 import math
 import typing
 from typing import List
+import json
 
 from dotenv import load_dotenv
 
@@ -334,6 +335,11 @@ async def playlist(interaction: discord.Interaction, url: str) -> None:
             playlist_dict = await util.run_blocking(bot, ydl.extract_info, url, download=False)
             # playlist_dict = ydl.extract_info(url, download=False)
             playlist_dict = ydl.sanitize_info(playlist_dict)
+
+            # # DEBUG PRINT
+            # with open('playlist.json', 'w') as fp:
+            #     json.dump(playlist_dict, fp)
+
             # Get info about the playlist
             playlist_title: str = playlist_dict["title"]  # Title
             playlist_uploader: str = playlist_dict["uploader"]  # Uploader
@@ -346,17 +352,24 @@ async def playlist(interaction: discord.Interaction, url: str) -> None:
     # Update progress to the user
     await interaction.edit_original_response(embed=util.compose_playlist_adding())
 
-    # Record no. of tracks that cannot be loaded
-    num_failed_tracks: int = 0
+    
 
-    # Attempt to load the tracks
-    for entry in playlist_entries: 
-        try:   
-            new_track: Track = Track(interaction.user, entry["webpage_url"], entry)
-            # Add track into queue
-            user_server.add_track(new_track)
-        except Exception as e:
-            num_failed_tracks += 1
+    # Attempt to load the tracks (non-blocking)
+    def load_entries():
+        # Record no. of tracks that cannot be loaded
+        num_failed_tracks: int = 0
+
+        for entry in playlist_entries: 
+            try:
+                new_track: Track = Track(interaction.user, entry.get("webpage_url", entry["url"]), entry)
+                # Add track into queue
+                user_server.add_track(new_track)
+            except Exception as e:
+                num_failed_tracks += 1
+        
+        return num_failed_tracks
+
+    num_failed_tracks: int = await util.run_blocking(bot, load_entries)
     
     # Start the queue if bot is not already playing
     if not (user_server.voice_client.is_playing() or user_server.voice_client.is_paused()):

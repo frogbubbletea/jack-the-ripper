@@ -47,6 +47,9 @@ class Track:
 
         Raises
         -------
+        ValueError
+            Track not available, i.e. private or deleted video.
+
         Exception
             Rethrows any exception during Track initialization.
         """
@@ -66,12 +69,20 @@ class Track:
             raise
 
         try:
+            # Check if track is unavailable
+            if not info["duration"]:
+                raise ValueError("Track is not available.")
+
             # Initialize attributes after track is found
             self.url: str = url
             self.title: str = info["title"]
             self.duration: int = info["duration"]
             self.uploader: str = info["uploader"]
-            self.thumbnail: str = info["thumbnail"]
+            # Video may have multiple thumbnails
+            try:
+                self.thumbnail: str = info["thumbnail"]
+            except:
+                self.thumbnail: str = info["thumbnails"][0]["url"]
         except Exception as e:  # Rethrow class initialization exception
             raise
 
@@ -887,7 +898,7 @@ class Server:
         format_info = f"[{title}]({url})\n"  # Title and URL
         format_info += f"👤 {uploader} | 💿 {len} tracks\n"  # Uploader and number of tracks
         if len_failed > 0:  # Add missing tracks warning
-            format_info += f"ℹ️ Only {len - len_failed}/{len} tracks loaded"
+            format_info += f"ℹ️ {len_failed} tracks failed to load"
 
         # Initialize embed
         embed_playlist_added = discord.Embed(

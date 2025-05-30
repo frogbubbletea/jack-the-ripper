@@ -24,7 +24,8 @@ ydl_opts = {
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'match_filter': 'original_url!*=/shorts/'
+    'match_filter': 'original_url!*=/shorts/',
+    'extract_flat': 'in_playlist'
 }
 
 # ffmpeg options
