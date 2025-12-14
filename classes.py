@@ -154,16 +154,25 @@ class Server:
         self.shuffle_status: bool = False  # Shuffle play
         self.voteskip_list: List[discord.Member] = []  # List of user IDs who voted to skip current track
     
-    def reset(self) -> None:
+    def reset(self, clear_queue: bool) -> None:
         """
         Resets all attributes of a Server instance.
+
+        Parameters
+        -----------
+        clear_queue: :class:`bool`
+            Whether to clear the Server's queue.
         """
+        if clear_queue:
+            self.queue = []
+        elif self.current_track:
+            self.queue.insert(0, self.current_track)
+
         # Cancel the idle timer if any
         if self.idle_timer is not None:
             self.idle_timer.cancel()
 
         self.voice_client = None
-        self.queue = []
         self.current_track = None
         self.start_time = 0
         self.pause_time = 0
@@ -418,7 +427,7 @@ class Server:
             0 if the bot successfully leaves the user's channel.
         """
         await self.voice_client.disconnect()
-        self.reset()
+        self.reset(clear_queue=True)
         return 0
     
     def add_track(self, track: Track) -> bool:

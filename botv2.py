@@ -162,6 +162,7 @@ async def succ(interaction: discord.Interaction) -> None:
 async def join(interaction: discord.Interaction) -> None:
     """
     Join/move to user's voice channel.
+    If there is a queue saved in the user's server, resume it.
 
     Refer to :func:`util.compose_join` for usage of status codes.
     """
@@ -171,9 +172,14 @@ async def join(interaction: discord.Interaction) -> None:
     user_server: Server = servers[interaction.guild_id]
 
     join_status: int = 5  # Status code from voice channel connection attempt
+
     # Try connecting to the voice channel
     try:
         join_status = await user_server.join_vc(interaction.user)
+
+        # Resume queue if saved
+        if user_server.queue and not user_server.current_track:
+            await user_server.play_next(interaction, loop=bot.loop)
     except ValueError:  # User not in voice channel
         join_status = 2
     except AttributeError:  # Bot already in the same voice channel
@@ -785,7 +791,7 @@ async def on_voice_state_update(member, before, after):
     # Check for remaining voice_client instances after disconnection
     if after.channel is None and member.id == bot.user.id:
         if user_server.voice_client is not None:
-            user_server.reset()
+            user_server.reset(clear_queue=False)
 
 @bot.event
 async def on_command_error(ctx, error):
